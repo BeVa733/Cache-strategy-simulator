@@ -33,5 +33,8 @@ public:
   /// empty. Use it if haven't enough space in cache.
   virtual std::optional<KeyType> selectVictim(void) = 0;
 
+  /// Notify the policy about a new request (required only for OPT).
+  virtual void onRequest(const KeyType&) {}
+
   virtual ~CachePolicy() = default;
 };

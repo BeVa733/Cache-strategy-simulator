@@ -4,12 +4,14 @@
 #include "../policies/ARC.hpp"
 #include "../policies/LFU.hpp"
 #include "../policies/LRU.hpp"
+#include "../policies/OPT.hpp"
 #include "CachePolicy.hpp"
 
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -30,31 +32,43 @@ public:
       std::vector<std::unique_ptr<CacheLevel<ValueType, KeyType>>>;
 
   /// Constructor with reading config file
-  explicit MultiLevelCache(const char *ConfigFilename) {
+  explicit MultiLevelCache(const char *ConfigFilename,
+                           const std::vector<KeyType> &RequestTrace) {
 
     using PolicyPtr = std::unique_ptr<CachePolicy<KeyType>>;
 
     // this hash map make connection between string policy names and class
     // costructors. Append new policies here after impementation
-    std::unordered_map<std::string, std::function<PolicyPtr(std::size_t)>>
+    std::unordered_map<
+        std::string,
+        std::function<PolicyPtr(std::size_t, const std::vector<KeyType> &)>>
         Constructors{
             {"LRU",
-             [](std::size_t Capacity) {
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<LRUPolicy<KeyType>>(Capacity);
              }},
+
             {"LFU",
-             [](std::size_t Capacity) {
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<LFUPolicy<KeyType>>(Capacity);
              }},
+
             {"2Q",
-             [](std::size_t Capacity) {
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
              }},
+
             {"ARC",
-             [](std::size_t Capacity) {
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<ARCPolicy<KeyType>>(Capacity);
              }},
-    };
+
+            {"OPT",
+             [](std::size_t Capacity,
+                const std::vector<KeyType> &Trace) {
+               return std::make_unique<OPTPolicy<KeyType>>(Capacity, Trace);
+             }},
+        };
 
     std::ifstream ConfigFile(ConfigFilename);
     if (!ConfigFile) {
@@ -69,7 +83,7 @@ public:
     }
 
     // read policy names in cycle
-    for (int i = 0; i < NumLevels_; ++i) {
+    for (std::size_t i = 0; i < NumLevels_; ++i) {
       std::string PolicyName;
       if (!(ConfigFile >> PolicyName)) {
         throw std::runtime_error(
@@ -92,17 +106,17 @@ public:
 
       // Add cache level into levels vector
       CacheLevels.emplace_back(std::make_unique<CacheLevel<ValueType, KeyType>>(
-          LevelCapacity, It->second(LevelCapacity)));
+          LevelCapacity, It->second(LevelCapacity, RequestTrace)));
     }
   }
 
   /// Return a cached value for \p Key or std::nullopt after a cache miss.
   std::optional<ValueType *> accessElement(KeyType Key) {
     ValueType *Value = nullptr;
-    int FoundLevel   = CacheLevels.size();
+    std::size_t FoundLevel = CacheLevels.size();
 
     // Complete the lookup before accessing the slow data source.
-    for (int Level = 0; Level < CacheLevels.size(); ++Level) {
+    for (std::size_t Level = 0; Level < CacheLevels.size(); ++Level) {
       std::optional<ValueType *> CachedValue =
           CacheLevels[Level]->findElement(Key);
       if (!CachedValue) {
@@ -171,7 +185,10 @@ public:
   }
 
   /// Function for immitate slow process of getting value
-  ValueType *slowGetPage(KeyType Key) { return nullptr; }
+  ValueType *slowGetPage(KeyType Key) {
+    (void)Key; // подавить предупреждение о неиспользуемом параметре
+    return nullptr;
+  }
 
 private:
   /// Cache levels number
