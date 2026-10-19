@@ -3,6 +3,7 @@
 #include "../policies/2Q.hpp"
 #include "../policies/ARC.hpp"
 #include "../policies/LFU.hpp"
+#include "../policies/LIRS.hpp"
 #include "../policies/LRU.hpp"
 #include "../policies/OPT.hpp"
 #include "CachePolicy.hpp"
@@ -62,6 +63,11 @@ public:
             {"ARC",
              [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<ARCPolicy<KeyType>>(Capacity);
+             }},
+
+            {"LIRS",
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
+               return std::make_unique<LIRSPolicy<KeyType>>(Capacity);
              }},
 
             {"OPT",
