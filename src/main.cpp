@@ -1,10 +1,31 @@
 #include "../include/Cache.hpp"
 
+#include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 
 int main() {
     try {
+        // Read number of levels from config to know how many capacities to expect.
+        std::ifstream ConfigFile("config.txt");
+        if (!ConfigFile) {
+            throw std::runtime_error("Unable to open config file: config.txt");
+        }
+
+        std::size_t NumLevels = 0;
+        if (!(ConfigFile >> NumLevels)) {
+            throw std::runtime_error("Incorrect config format: expected number of cache levels");
+        }
+
+        // Read level capacities from stdin.
+        std::vector<std::size_t> Capacities(NumLevels);
+        for (std::size_t i = 0; i < NumLevels; ++i) {
+            if (!(std::cin >> Capacities[i])) {
+                throw std::runtime_error("Unable to read capacity for cache level " + std::to_string(i));
+            }
+        }
+
         // Read whole list of requests.
         std::vector<int> RequestTrace;
 
@@ -16,6 +37,7 @@ int main() {
         // Send all requests to cache.
         MultiLevelCache<int, int> CacheSystem(
             "config.txt",
+            Capacities,
             RequestTrace
         );
 

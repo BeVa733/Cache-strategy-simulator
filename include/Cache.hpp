@@ -33,6 +33,7 @@ public:
 
   /// Constructor with reading config file
   explicit MultiLevelCache(const char *ConfigFilename,
+                           const std::vector<std::size_t> &Capacities,
                            const std::vector<KeyType> &RequestTrace) {
 
     using PolicyPtr = std::unique_ptr<CachePolicy<KeyType>>;
@@ -97,12 +98,8 @@ public:
         throw std::runtime_error("Unknown cache policy: " + PolicyName);
       }
 
-      // get level capacity from stdin
-      std::size_t LevelCapacity;
-      if (!(std::cin >> LevelCapacity)) {
-        throw std::runtime_error("Unable to read capacity for cache level " +
-                                 std::to_string(i));
-      }
+      // get level capacity
+      std::size_t LevelCapacity = Capacities[i];
 
       // Add cache level into levels vector
       CacheLevels.emplace_back(std::make_unique<CacheLevel<ValueType, KeyType>>(
@@ -112,6 +109,10 @@ public:
 
   /// Return a cached value for \p Key or std::nullopt after a cache miss.
   std::optional<ValueType *> accessElement(KeyType Key) {
+    for (auto &CL : CacheLevels) {
+      CL->Policy->onRequest(Key);
+    }
+
     ValueType *Value = nullptr;
     std::size_t FoundLevel = CacheLevels.size();
 
