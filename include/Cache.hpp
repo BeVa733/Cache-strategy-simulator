@@ -83,6 +83,11 @@ public:
           "Incorrect config format: expected number of cache levels");
     }
 
+    if (Capacities.size() != NumLevels_) {
+      throw std::runtime_error(
+          "Number of capacities does not match cache levels");
+    }
+
     // read policy names in cycle
     for (std::size_t i = 0; i < NumLevels_; ++i) {
       std::string PolicyName;
