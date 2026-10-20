@@ -101,14 +101,18 @@ public:
       return;
     }
 
-    // A resident HIR hit becomes LIR. Its slot in Queue_ is replaced by the
-    // oldest LIR, which becomes HIR.
-    removeFromQueue(Entry);
-    if (Entry.InStack) {
-      moveToStackFront(Key);
-    } else {
+    // A resident HIR can be promoted only when it is already in S_. If it is
+    // absent from S_, its reuse distance is larger than every LIR's, so keep
+    // it HIR and only refresh its position in S_ and Queue_.
+    if (!Entry.InStack) {
       addToStackFront(Key);
+      removeFromQueue(Entry);
+      addToQueueFront(Key);
+      return;
     }
+
+    removeFromQueue(Entry);
+    moveToStackFront(Key);
 
     if (LIRCapacity_ == 0) {
       addToQueueFront(Key);
