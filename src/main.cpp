@@ -1,61 +1,80 @@
 #include "../include/Cache.hpp"
 
+#include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
-int main() {
-    try {
-        // Read number of levels from config to know how many capacities to expect.
-        std::ifstream ConfigFile("config.txt");
-        if (!ConfigFile) {
-            throw std::runtime_error("Unable to open config file: config.txt");
-        }
+namespace {
 
-        std::size_t NumLevels = 0;
-        if (!(ConfigFile >> NumLevels)) {
-            throw std::runtime_error("Incorrect config format: expected number of cache levels");
-        }
+std::size_t readLevelCount(const std::string &ConfigFilename) {
+  std::ifstream ConfigFile(ConfigFilename);
+  std::size_t NumLevels = 0;
+  if (!ConfigFile || !(ConfigFile >> NumLevels) || NumLevels == 0) {
+    throw std::runtime_error(
+        "Unable to read a positive cache level count from config: " +
+        ConfigFilename);
+  }
+  return NumLevels;
+}
 
-        // Read level capacities from stdin.
-        std::vector<std::size_t> Capacities(NumLevels);
-        for (std::size_t i = 0; i < NumLevels; ++i) {
-            if (!(std::cin >> Capacities[i])) {
-                throw std::runtime_error("Unable to read capacity for cache level " + std::to_string(i));
-            }
-        }
+std::size_t readNonNegativeSize(const char *Name) {
+  int Value = 0;
+  if (!(std::cin >> Value) || Value < 0) {
+    throw std::runtime_error(std::string("Expected a non-negative ") + Name);
+  }
+  return Value;
+}
 
-        // Read whole list of requests.
-        std::vector<int> RequestTrace;
+std::vector<int> readTrace(std::size_t Count) {
+  std::vector<int> Trace;
+  Trace.reserve(Count);
 
-        int Key;
-        while (std::cin >> Key) {
-            RequestTrace.push_back(Key);
-        }
+  for (std::size_t Index = 0; Index < Count; ++Index) {
+    int Key = 0;
+    if (!(std::cin >> Key)) {
+      throw std::runtime_error("Expected key " + std::to_string(Index + 1) +
+                               " of " + std::to_string(Count));
+    }
+    Trace.push_back(Key);
+  }
 
-        // Send all requests to cache.
-        MultiLevelCache<int, int> CacheSystem(
-            "config.txt",
-            Capacities,
-            RequestTrace
-        );
+  std::cin >> std::ws;
+  if (!std::cin.eof()) {
+    throw std::runtime_error("Unexpected data after the request trace");
+  }
 
-        // Process requests in the original order.
-        for (int Key : RequestTrace) {
-            CacheSystem.accessElement(Key);
-        }
+  return Trace;
+}
 
-        // Display the statistics.
-        std::cout << "Hit count = "
-                  << CacheSystem.HitCount_ << '\n';
+} // namespace
 
-        std::cout << "Miss count = "
-                  << CacheSystem.MissCount_ << '\n';
-
-    } catch (const std::exception& Exception) {
-        std::cout << Exception.what() << '\n';
+int main(int argc, char **argv) {
+  try {
+    if (argc > 2) {
+      throw std::runtime_error("Usage: cache [config-file]");
     }
 
-    return 0;
+    const std::string ConfigFilename    = argc == 2 ? argv[1] : "config.txt";
+    const std::size_t NumLevels         = readLevelCount(ConfigFilename);
+    const std::size_t Capacity          = readNonNegativeSize("cache capacity");
+    const std::size_t RequestCount      = readNonNegativeSize("request count");
+    const std::vector<int> RequestTrace = readTrace(RequestCount);
+    const std::vector<std::size_t> Capacities(NumLevels, Capacity);
+
+    MultiLevelCache<int> CacheSystem(ConfigFilename.c_str(), Capacities,
+                                     RequestTrace);
+    for (int Key : RequestTrace) {
+      CacheSystem.accessElement(Key);
+    }
+
+    std::cout << CacheSystem.hitCount() << '\n';
+    return EXIT_SUCCESS;
+  } catch (const std::exception &Exception) {
+    std::cerr << Exception.what() << '\n';
+    return EXIT_FAILURE;
+  }
 }

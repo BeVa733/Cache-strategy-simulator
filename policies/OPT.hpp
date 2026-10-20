@@ -17,7 +17,7 @@ public:
   OPTPolicy(std::size_t capacity, const std::vector<KeyType> &requestTrace)
       : capacity_(capacity), requestTrace_(requestTrace) {}
 
-  std::string getPolicyName() override { return "OPT"; }
+  std::string getPolicyName() const override { return "OPT"; }
 
   // Caller must invoke it for each request.
   void onRequest(const KeyType &key) override {

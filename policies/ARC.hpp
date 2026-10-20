@@ -29,7 +29,7 @@ public:
   explicit ARCPolicy(std::size_t Capacity)
       : Capacity_(Capacity), TargetSize_(0) {}
 
-  std::string getPolicyName() override { return "ARC"; }
+  std::string getPolicyName() const override { return "ARC"; }
 
   bool needInsertInCache(const KeyType &Key) override {
 

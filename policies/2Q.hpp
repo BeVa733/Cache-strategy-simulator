@@ -13,7 +13,7 @@ public:
       : Capacity_(Size), A1Capacity_(std::max<std::size_t>(1, Size / 4)) {
   } // 25% to A1Capacity
 
-  std::string getPolicyName() override { return "2Q"; }
+  std::string getPolicyName() const override { return "2Q"; }
 
   bool needInsertInCache(const KeyType &Key) override { return true; }
 

@@ -33,7 +33,7 @@ public:
       : Capacity_(Size), HIRCapacity_(calculateHIRCapacity(Size)),
         LIRCapacity_(Size - HIRCapacity_) {}
 
-  std::string getPolicyName() override { return "LIRS"; }
+  std::string getPolicyName() const override { return "LIRS"; }
 
   bool needInsertInCache(const KeyType &) override { return Capacity_ != 0; }
 

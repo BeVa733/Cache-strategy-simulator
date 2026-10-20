@@ -11,7 +11,7 @@ template <typename KeyType> class CachePolicy {
 
 public:
   /// Return policy name for debug or beauty output
-  virtual std::string getPolicyName() = 0;
+  virtual std::string getPolicyName() const = 0;
 
   /// Return true if pollicy need insert \p Key into Cache after miss. Most
   /// likely return true in majority of policies
