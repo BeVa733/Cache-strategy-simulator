@@ -5,8 +5,9 @@
 
 int main(int argc, char **argv) {
   if (argc < 4) {
-    std::cerr << "usage: " << argv[0]
-              << " <cycle|hot|scan|phase|random> <capacity> <requests> [argument]\n";
+    std::cerr
+        << "usage: " << argv[0]
+        << " <cycle|hot|scan|phase|random> <capacity> <requests> [argument]\n";
     return 1;
   }
 
