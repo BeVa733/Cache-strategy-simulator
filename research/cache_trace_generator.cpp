@@ -6,7 +6,7 @@
 int main(int argc, char **argv) {
   if (argc < 4) {
     std::cerr << "usage: " << argv[0]
-              << " <cycle|hot|scan|phase> <capacity> <requests> [argument]\n";
+              << " <cycle|hot|scan|phase|random> <capacity> <requests> [argument]\n";
     return 1;
   }
 
@@ -58,10 +58,23 @@ int main(int argc, char **argv) {
     // Alternate between two disjoint working sets.
   } else if (scenario == "phase") {
 
+    const int workingSet = argc > 4 ? argument : capacity;
+    if (workingSet <= 0)
+      return 1;
     for (int i = 0; i < requests; ++i) {
       const int phase = (i / std::max(1, 4 * capacity)) % 2;
-      std::cout << ' ' << phase * capacity + i % capacity;
+      std::cout << ' ' << phase * workingSet + i % workingSet;
     }
+
+  } else if (scenario == "random") {
+    // Choose every request uniformly from a fixed working set.
+    const int workingSet = argc > 4 ? argument : 4 * capacity;
+    if (workingSet <= 0)
+      return 1;
+    std::mt19937 random(42);
+    std::uniform_int_distribution<int> key(0, workingSet - 1);
+    for (int i = 0; i < requests; ++i)
+      std::cout << ' ' << key(random);
 
   } else {
     std::cerr << "unknown scenario\n";
