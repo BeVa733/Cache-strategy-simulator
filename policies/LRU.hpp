@@ -11,7 +11,7 @@ template <typename KeyType> class LRUPolicy : public CachePolicy<KeyType> {
 public:
   explicit LRUPolicy(std::size_t Size) : Capacity_(Size) {}
 
-  std::string getPolicyName() override { return "LRU"; }
+  std::string getPolicyName() const override { return "LRU"; }
 
   bool needInsertInCache(const KeyType &) override { return true; }
 

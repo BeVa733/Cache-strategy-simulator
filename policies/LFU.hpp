@@ -9,7 +9,7 @@ template <typename KeyType> class LFUPolicy : public CachePolicy<KeyType> {
 public:
   LFUPolicy(std::size_t Size) : Capacity_(Size) {}
 
-  std::string getPolicyName() override { return "LFU"; }
+  std::string getPolicyName() const override { return "LFU"; }
 
   bool needInsertInCache(const KeyType &Key) override { return true; }
 
