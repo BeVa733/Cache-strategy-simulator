@@ -26,7 +26,7 @@ std::size_t readNonNegativeSize(const char *Name) {
   if (!(std::cin >> Value) || Value < 0) {
     throw std::runtime_error(std::string("Expected a non-negative ") + Name);
   }
-  return Value;
+  return static_cast<std::size_t>(Value);
 }
 
 std::vector<int> readTrace(std::size_t Count) {

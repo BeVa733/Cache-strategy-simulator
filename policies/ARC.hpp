@@ -36,6 +36,7 @@ public:
     InsertAsHotCache_         = false;
     VictimGoesToGhost_        = false;
     LastMissWasFromHotGhosts_ = false;
+    DiscardFreshVictim_       = false;
 
     if (Capacity_ == 0) {
       return false;
@@ -89,8 +90,12 @@ public:
 
       if (FreshCache_.size() < Capacity_) {
         removeLRU(ListType::FreshGhosts_);
+        VictimGoesToGhost_ = true;
+      } else {
+        // When T1 itself occupies the whole cache, ARC discards its LRU key
+        // instead of adding it to B1.
+        DiscardFreshVictim_ = true;
       }
-      VictimGoesToGhost_ = true;
     } else {
 
       std::size_t DirectorySize = FreshCache_.size() + HotCache_.size() +
@@ -126,6 +131,7 @@ public:
 
     InsertAsHotCache_  = false;
     VictimGoesToGhost_ = false;
+    DiscardFreshVictim_ = false;
   }
 
   void onCacheHit(const KeyType &Key) override {
@@ -172,6 +178,7 @@ public:
     }
 
     VictimGoesToGhost_ = false;
+    DiscardFreshVictim_ = false;
   }
 
   std::optional<KeyType> selectVictim(void) override {
@@ -179,6 +186,10 @@ public:
     if (FreshCache_.empty() && HotCache_.empty()) {
       std::cerr << "[ARC] Warning: try to search victim in empty cache\n";
       return std::nullopt;
+    }
+
+    if (DiscardFreshVictim_) {
+      return FreshCache_.back();
     }
 
     // Victim is from FreshCache_, if FreshCache_ more than target size,
@@ -281,4 +292,5 @@ private:
   bool InsertAsHotCache_{false};
   bool VictimGoesToGhost_{false};
   bool LastMissWasFromHotGhosts_{false};
+  bool DiscardFreshVictim_{false};
 };
