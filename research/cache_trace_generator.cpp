@@ -5,9 +5,9 @@
 
 int main(int argc, char **argv) {
   if (argc < 4) {
-    std::cerr
-        << "usage: " << argv[0]
-        << " <cycle|hot|scan|phase|random> <capacity> <requests> [argument]\n";
+    std::cerr << "usage: " << argv[0]
+              << " <cycle|hot|scan|phase|random|mixed> <capacity> <requests> "
+                 "[argument]\n";
     return 1;
   }
 
@@ -76,6 +76,59 @@ int main(int argc, char **argv) {
     std::uniform_int_distribution<int> key(0, workingSet - 1);
     for (int i = 0; i < requests; ++i)
       std::cout << ' ' << key(random);
+
+  } else if (scenario == "mixed") {
+    // Combine long workload phases with one persistent hot set.
+    const int sections     = 5;
+    const int cycleSize    = 4 * capacity + 1;
+    const int hotSize      = std::max(1, capacity / 5);
+    const int sharedSize   = std::max(1, capacity / 4);
+    const int universe     = std::max(hotSize + 1, capacity * 10);
+    const int sharedOffset = sections * 1000000;
+    std::mt19937 random(argument);
+    std::uniform_int_distribution<int> percent(0, 99);
+    std::uniform_int_distribution<int> hot(0, hotSize - 1);
+    std::uniform_int_distribution<int> cold(hotSize, universe - 1);
+    std::uniform_int_distribution<int> randomKey(0, 4 * capacity - 1);
+
+    for (int i = 0; i < requests; ++i) {
+      const int section = std::min(sections - 1, i * sections / requests);
+      const int local   = i - section * requests / sections;
+      const int offset  = section * 1000000;
+      int key           = 0;
+
+      // Every tenth request uses a hot key shared by all phases.
+      if (local % 10 == 0) {
+        key = sharedOffset + local / 10 % sharedSize;
+        std::cout << ' ' << key;
+        continue;
+      }
+
+      const int patternRequest = local - local / 10 - 1;
+
+      if (section == 0)
+        key = patternRequest % cycleSize;
+
+      if (section == 1)
+        key = percent(random) < 80 ? hot(random) : cold(random);
+
+      if (section == 2) {
+        const int active   = std::max(1, capacity / 4);
+        const int position = patternRequest % (2 * active + capacity);
+        key                = position < 2 * active ? position % active
+                                                   : capacity + patternRequest;
+      }
+
+      if (section == 3) {
+        const int phase = (patternRequest / std::max(1, 2 * capacity)) % 2;
+        key             = phase * capacity + patternRequest % capacity;
+      }
+
+      if (section == 4)
+        key = randomKey(random);
+
+      std::cout << ' ' << offset + key;
+    }
 
   } else {
     std::cerr << "unknown scenario\n";
