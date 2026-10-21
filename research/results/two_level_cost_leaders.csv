@@ -1,0 +1,4 @@
+rank,scenario,level1,level2,total_cost,reference_cost,normalized
+1,mixed,LIRS,LRU,966468,896376,1.078195
+2,mixed,LIRS,2Q,966468,896376,1.078195
+3,mixed,LIRS,ARC,966468,896376,1.078195

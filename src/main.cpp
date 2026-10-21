@@ -3,7 +3,9 @@
 #include <cstddef>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -54,16 +56,53 @@ std::vector<int> readTrace(std::size_t Count) {
 
 int main(int argc, char **argv) {
   try {
-    if (argc > 2) {
-      throw std::runtime_error("Usage: cache [config-file]");
+    std::string ConfigFilename = "config.txt";
+    bool PrintCost             = false;
+    bool ConfigProvided        = false;
+    std::size_t CapacityGrowth = 1;
+
+    for (int Index = 1; Index < argc; ++Index) {
+      const std::string Argument = argv[Index];
+      if (Argument == "--cost") {
+        PrintCost = true;
+      } else if (Argument == "--capacity-growth") {
+        if (++Index == argc)
+          throw std::runtime_error("Expected a value after --capacity-growth");
+
+        const int Growth = std::stoi(argv[Index]);
+        if (Growth <= 0)
+          throw std::runtime_error("Capacity growth must be positive");
+
+        CapacityGrowth = static_cast<std::size_t>(Growth);
+      } else if (Argument.rfind("--", 0) == 0) {
+        throw std::runtime_error("Unknown option: " + Argument);
+      } else if (!ConfigProvided) {
+        ConfigFilename = Argument;
+        ConfigProvided = true;
+      } else {
+        throw std::runtime_error(
+            "Usage: cache [config-file] [--cost] [--capacity-growth N]");
+      }
     }
 
-    const std::string ConfigFilename    = argc == 2 ? argv[1] : "config.txt";
     const std::size_t NumLevels         = readLevelCount(ConfigFilename);
     const std::size_t Capacity          = readNonNegativeSize("cache capacity");
     const std::size_t RequestCount      = readNonNegativeSize("request count");
     const std::vector<int> RequestTrace = readTrace(RequestCount);
-    const std::vector<std::size_t> Capacities(NumLevels, Capacity);
+    std::vector<std::size_t> Capacities;
+    std::size_t LevelCapacity = Capacity;
+
+    for (std::size_t Level = 0; Level < NumLevels; ++Level) {
+      Capacities.push_back(LevelCapacity);
+      if (Level + 1 == NumLevels)
+        continue;
+
+      if (LevelCapacity >
+          std::numeric_limits<std::size_t>::max() / CapacityGrowth)
+        throw std::runtime_error("Cache capacity overflow");
+
+      LevelCapacity *= CapacityGrowth;
+    }
 
     MultiLevelCache<int> CacheSystem(ConfigFilename.c_str(), Capacities,
                                      RequestTrace);
@@ -71,7 +110,11 @@ int main(int argc, char **argv) {
       CacheSystem.accessElement(Key);
     }
 
-    std::cout << CacheSystem.hitCount() << '\n';
+    if (PrintCost)
+      std::cout << std::setprecision(17) << CacheSystem.totalCost() << '\n';
+    else
+      std::cout << CacheSystem.hitCount() << '\n';
+
     return EXIT_SUCCESS;
   } catch (const std::exception &Exception) {
     std::cerr << Exception.what() << '\n';

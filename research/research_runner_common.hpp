@@ -8,6 +8,8 @@
 
 namespace research_runner {
 
+inline constexpr int CostCapacityGrowth = 2;
+
 // Shared command-line settings for research executables.
 struct Settings {
   std::string Cache;
@@ -112,15 +114,18 @@ inline bool generateTrace(const std::string &Generator,
 
 inline void writeConfig(const std::string &ConfigFile,
                         const std::vector<std::string> &Levels) {
-  // All research runs currently use unit costs.
+  // Use one order of magnitude per level and a fixed miss penalty.
   std::ofstream Config(ConfigFile);
   Config << Levels.size();
   for (const std::string &Level : Levels)
     Config << ' ' << Level;
   Config << "\ncosts";
-  for (std::size_t i = 0; i < Levels.size(); ++i)
-    Config << " 1";
-  Config << "\nmiss_cost 1\n";
+  int Cost = 1;
+  for (std::size_t i = 0; i < Levels.size(); ++i) {
+    Config << ' ' << Cost;
+    Cost *= 10;
+  }
+  Config << "\nmiss_cost 1000\n";
 }
 
 inline int runCache(const std::string &Cache, const std::string &ConfigFile,
@@ -136,6 +141,24 @@ inline int runCache(const std::string &Cache, const std::string &ConfigFile,
   int Hits = 0;
   Result >> Hits;
   return Hits;
+}
+
+inline double runCacheCost(const std::string &Cache,
+                           const std::string &ConfigFile,
+                           const std::string &TraceFile,
+                           const std::string &ResultFile) {
+  // Request the accumulated access cost from the same simulator run.
+  const std::string Command = Cache + " " + ConfigFile +
+                              " --cost --capacity-growth " +
+                              std::to_string(CostCapacityGrowth) + " < " +
+                              TraceFile + " > " + ResultFile;
+  if (std::system(Command.c_str()) != 0)
+    return -1.0;
+
+  std::ifstream Result(ResultFile);
+  double Cost = 0.0;
+  Result >> Cost;
+  return Cost;
 }
 
 inline bool makeIdealTrace(const std::string &TraceFile,
