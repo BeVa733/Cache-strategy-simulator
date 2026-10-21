@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../policies/2Q.hpp"
-#include "../policies/ARC.hpp"
 #include "../policies/LFU.hpp"
 #include "../policies/LIRS.hpp"
 #include "../policies/LRU.hpp"
@@ -47,30 +46,13 @@ public:
              [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<LRUPolicy<KeyType>>(Capacity);
              }},
-
             {"LFU",
-             [](std::size_t Capacity, const std::vector<KeyType> &) {
+             [](std::size_t Capacity) {
                return std::make_unique<LFUPolicy<KeyType>>(Capacity);
              }},
-
             {"2Q",
-             [](std::size_t Capacity, const std::vector<KeyType> &) {
+             [](std::size_t Capacity) {
                return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
-             }},
-
-            {"ARC",
-             [](std::size_t Capacity, const std::vector<KeyType> &) {
-               return std::make_unique<ARCPolicy<KeyType>>(Capacity);
-             }},
-
-            {"LIRS",
-             [](std::size_t Capacity, const std::vector<KeyType> &) {
-               return std::make_unique<LIRSPolicy<KeyType>>(Capacity);
-             }},
-
-            {"OPT",
-             [](std::size_t Capacity, const std::vector<KeyType> &Trace) {
-               return std::make_unique<OPTPolicy<KeyType>>(Capacity, Trace);
              }},
     };
 
