@@ -3,66 +3,13 @@
 // Prints hit rate (%) of every policy on every pattern, plus the hit rate of
 // an ideal cache (Belady: evicts the key needed farthest in the future).
 
-#include "../include/Cache.hpp"
+#include "TestUtils.hpp"
 
-#include <cstdio>
-#include <fstream>
 #include <iomanip>
 #include <random>
-#include <sstream>
-#include <vector>
 
 static const std::size_t Capacity = 32;
 static const std::size_t Length = 5000;
-
-static std::size_t runPolicy(const std::string &Policy,
-                             const std::vector<int> &Trace) {
-  std::ofstream("cmp_config.tmp") << "1\n" << Policy << '\n';
-
-  std::istringstream FakeInput(std::to_string(Capacity));
-  std::streambuf *RealInput = std::cin.rdbuf(FakeInput.rdbuf());
-
-  MultiLevelCache<int, int> Cache("cmp_config.tmp");
-  for (int Key : Trace) {
-    Cache.accessElement(Key);
-  }
-
-  std::cin.rdbuf(RealInput);
-  std::remove("cmp_config.tmp");
-  return Cache.HitCount_;
-}
-
-// Ideal cache. For every position we know when the key is used next, and
-// on eviction we drop the key whose next use is farthest away.
-static std::size_t runIdeal(const std::vector<int> &Trace) {
-  const std::size_t Never = Trace.size();
-  std::vector<std::size_t> NextUse(Trace.size(), Never);
-  std::unordered_map<int, std::size_t> LastSeen;
-  for (std::size_t I = Trace.size(); I-- > 0;) {
-    if (LastSeen.count(Trace[I])) {
-      NextUse[I] = LastSeen[Trace[I]];
-    }
-    LastSeen[Trace[I]] = I;
-  }
-
-  std::unordered_map<int, std::size_t> Cache; // key -> next use
-  std::size_t Hits = 0;
-  for (std::size_t I = 0; I < Trace.size(); ++I) {
-    if (Cache.count(Trace[I])) {
-      ++Hits;
-    } else if (Cache.size() >= Capacity) {
-      auto Victim = Cache.begin();
-      for (auto It = Cache.begin(); It != Cache.end(); ++It) {
-        if (It->second > Victim->second) {
-          Victim = It;
-        }
-      }
-      Cache.erase(Victim);
-    }
-    Cache[Trace[I]] = NextUse[I];
-  }
-  return Hits;
-}
 
 // ---- access patterns -------------------------------------------------------
 
@@ -138,9 +85,10 @@ int main() {
     std::cout << std::left << std::setw(14) << Pat.Name;
     for (const auto &P : Policies) {
       std::cout << std::right << std::setw(8)
-                << 100.0 * runPolicy(P, Trace) / Length;
+                << 100.0 * runPolicy(P, Capacity, Trace) / Length;
     }
-    std::cout << std::setw(8) << 100.0 * runIdeal(Trace) / Length << '\n';
+    std::cout << std::setw(8) << 100.0 * runIdeal(Capacity, Trace) / Length
+              << '\n';
   }
   return 0;
 }
