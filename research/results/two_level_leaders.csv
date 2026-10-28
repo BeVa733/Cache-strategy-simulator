@@ -1,0 +1,4 @@
+rank,scenario,level1,level2,hits,ideal_hits,normalized
+1,mixed,LIRS,ARC,841,1010,0.832673
+2,mixed,LIRS,LRU,841,1010,0.832673
+3,mixed,LRU,2Q,784,1010,0.776238

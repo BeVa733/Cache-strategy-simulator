@@ -94,8 +94,10 @@ private:
 
   std::unordered_map<KeyType, Entry> Index_;
 
-  std::list<KeyType> A1In_; // newcomers, FIFO
-  std::list<KeyType> Am_;   // hot keys, LRU
+  std::list<KeyType> A1In_;  // newcomers, FIFO
+  std::list<KeyType> Am_;    // hot keys, LRU
+  std::list<KeyType> A1Out_; // ghost queue for evicted newcomers
+  std::unordered_map<KeyType, ListIt> A1OutIndex_;
 
   std::size_t Capacity_;   // total number of slots
   std::size_t A1Capacity_; // newcomers quota
