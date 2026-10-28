@@ -11,6 +11,7 @@
 #include "TestUtils.hpp"
 
 #include <chrono>
+#include <sstream>
 #include <random>
 
 static const std::vector<std::string> Policies = {"LRU", "LFU", "2Q"};

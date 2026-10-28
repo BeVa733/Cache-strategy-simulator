@@ -2,7 +2,6 @@
 
 #include "../policies/2Q.hpp"
 #include "../policies/LFU.hpp"
-#include "../policies/LIRS.hpp"
 #include "../policies/LRU.hpp"
 #include "../policies/OPT.hpp"
 #include "CachePolicy.hpp"
@@ -47,11 +46,11 @@ public:
                return std::make_unique<LRUPolicy<KeyType>>(Capacity);
              }},
             {"LFU",
-             [](std::size_t Capacity) {
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<LFUPolicy<KeyType>>(Capacity);
              }},
             {"2Q",
-             [](std::size_t Capacity) {
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
              }},
     };

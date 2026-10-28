@@ -7,15 +7,13 @@
 
 #include <cstdio>
 #include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 
 using Trace = std::vector<int>;
 
 // Run MultiLevelCache with the given levels on the trace and return hits.
-// The cache reads policy names from a config file and capacities from
-// std::cin, so we write a temporary file and feed std::cin from a string.
+// The cache reads policy names from a config file, so we write a temporary one.
 inline std::size_t runSystem(const std::vector<std::string> &Policies,
                              const std::vector<std::size_t> &Capacities,
                              const Trace &Keys) {
@@ -26,25 +24,13 @@ inline std::size_t runSystem(const std::vector<std::string> &Policies,
   }
   Config.close();
 
-  std::string Input;
-  for (std::size_t C : Capacities) {
-    Input += std::to_string(C) + ' ';
-  }
-  std::istringstream FakeInput(Input);
-  std::streambuf *RealInput = std::cin.rdbuf(FakeInput.rdbuf());
-
-  std::size_t Hits;
-  {
-    MultiLevelCache<int, int> Cache("test_config.tmp");
-    for (int Key : Keys) {
-      Cache.accessElement(Key);
-    }
-    Hits = Cache.HitCount_;
+  MultiLevelCache<int> Cache("test_config.tmp", Capacities, Keys);
+  for (int Key : Keys) {
+    Cache.accessElement(Key);
   }
 
-  std::cin.rdbuf(RealInput);
   std::remove("test_config.tmp");
-  return Hits;
+  return Cache.hitCount();
 }
 
 // One level with one policy.
