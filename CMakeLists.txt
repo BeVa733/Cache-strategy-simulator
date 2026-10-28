@@ -13,9 +13,14 @@ target_include_directories(cache PRIVATE
 
 target_compile_features(cache PRIVATE cxx_std_17)
 
-add_subdirectory(research)
+# ---- tests: ctest --test-dir build, or ./build/policy_tests; table: ./build/compare
+enable_testing()
 
-include(CTest)
-if(BUILD_TESTING)
-  add_subdirectory(tests)
-endif()
+add_executable(policy_tests tests/PolicyTests.cpp)
+target_include_directories(policy_tests PRIVATE include policies)
+target_compile_features(policy_tests PRIVATE cxx_std_17)
+add_test(NAME policy_tests COMMAND policy_tests)
+
+add_executable(compare tests/Compare.cpp)
+target_include_directories(compare PRIVATE include policies)
+target_compile_features(compare PRIVATE cxx_std_17)
