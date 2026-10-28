@@ -8,6 +8,7 @@
 #include <list>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
 
 template <typename KeyType> class ARCPolicy : public CachePolicy<KeyType> {
@@ -129,8 +130,8 @@ public:
     addToFront(Key,
                InsertAsHotCache_ ? ListType::HotCache_ : ListType::FreshCache_);
 
-    InsertAsHotCache_  = false;
-    VictimGoesToGhost_ = false;
+    InsertAsHotCache_   = false;
+    VictimGoesToGhost_  = false;
     DiscardFreshVictim_ = false;
   }
 
@@ -177,7 +178,7 @@ public:
       return;
     }
 
-    VictimGoesToGhost_ = false;
+    VictimGoesToGhost_  = false;
     DiscardFreshVictim_ = false;
   }
 

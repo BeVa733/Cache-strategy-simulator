@@ -6,6 +6,9 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
 std::vector<std::string> split(const std::string &Line) {
   // Parse the simple comma-separated leader table.
@@ -67,7 +70,7 @@ int main(int argc, char **argv) {
   std::filesystem::create_directories("research/results");
   std::ofstream Csv("research/results/three_level_results.csv");
   std::ofstream CostCsv("research/results/three_level_cost_results.csv");
-  
+
   CostCsv << std::setprecision(17);
 
   Csv << "scenario,capacity_per_level,requests,level1,level2,level3,hits,ideal_"

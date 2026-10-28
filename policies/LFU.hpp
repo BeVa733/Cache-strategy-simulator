@@ -1,6 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <iostream>
+#include <optional>
+#include <string>
 #include <unordered_map>
 
 #include "CachePolicy.hpp"

@@ -1,18 +1,19 @@
 #pragma once
 
-#include "2Q.hpp"
-#include "ARC.hpp"
 #include "CachePolicy.hpp"
-#include "LFU.hpp"
-#include "LIRS.hpp"
-#include "LRU.hpp"
-#include "OPT.hpp"
+
+#include "2Q.hpp"   // IWYU pragma: keep
+#include "ARC.hpp"  // IWYU pragma: keep
+#include "LFU.hpp"  // IWYU pragma: keep
+#include "LIRS.hpp" // IWYU pragma: keep
+#include "LRU.hpp"  // IWYU pragma: keep
+#include "OPT.hpp"  // IWYU pragma: keep
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <functional>
-#include <istream>
 #include <memory>
 #include <optional>
 #include <stdexcept>

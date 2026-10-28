@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <string>
+#include <vector>
 
 int main(int argc, char **argv) {
 

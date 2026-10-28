@@ -1,8 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 #include <list>
+#include <optional>
+#include <string>
 #include <unordered_map>
 
 #include "CachePolicy.hpp"
