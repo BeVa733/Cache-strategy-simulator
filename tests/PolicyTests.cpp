@@ -5,7 +5,7 @@
 // The expected numbers are worked out by hand in the comments
 // (m = miss, h = hit, {...} = cache contents after the access).
 
-#include "../include/Cache.hpp"
+#include "Cache.hpp"
 
 #include <chrono>
 #include <cstdint>

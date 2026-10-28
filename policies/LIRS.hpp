@@ -8,7 +8,7 @@
 #include <optional>
 #include <unordered_map>
 
-#include "../include/CachePolicy.hpp"
+#include "CachePolicy.hpp"
 
 template <typename KeyType> class LIRSPolicy : public CachePolicy<KeyType> {
 

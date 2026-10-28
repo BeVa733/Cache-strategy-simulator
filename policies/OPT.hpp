@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../include/CachePolicy.hpp"
+#include "CachePolicy.hpp"
 
 #include <cstddef>
 #include <optional>

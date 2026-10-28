@@ -3,7 +3,7 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "../include/CachePolicy.hpp"
+#include "CachePolicy.hpp"
 
 template <typename KeyType> class LFUPolicy : public CachePolicy<KeyType> {
 public:

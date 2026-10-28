@@ -1,12 +1,12 @@
 #pragma once
 
-#include "../policies/2Q.hpp"
-#include "../policies/ARC.hpp"
-#include "../policies/LFU.hpp"
-#include "../policies/LIRS.hpp"
-#include "../policies/LRU.hpp"
-#include "../policies/OPT.hpp"
+#include "2Q.hpp"
+#include "ARC.hpp"
 #include "CachePolicy.hpp"
+#include "LFU.hpp"
+#include "LIRS.hpp"
+#include "LRU.hpp"
+#include "OPT.hpp"
 
 #include <cmath>
 #include <cstdint>

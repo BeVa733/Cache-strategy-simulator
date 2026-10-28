@@ -5,7 +5,7 @@
 #include <list>
 #include <unordered_map>
 
-#include "../include/CachePolicy.hpp"
+#include "CachePolicy.hpp"
 
 template <typename KeyType> class TwoQPolicy : public CachePolicy<KeyType> {
 public:
