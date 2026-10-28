@@ -1,19 +1,18 @@
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
-#include <iostream>
 #include <map>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct Result {
-  std::string Scenario;
   std::string First;
   std::string Second;
-  double Value      = 0.0;
-  double Reference  = 0.0;
-  double Normalized = 0.0;
+  int Samples          = 0;
+  double NormalizedSum = 0.0;
+  double Worst         = 0.0;
 };
 
 std::vector<std::string> split(const std::string &Line) {
@@ -28,7 +27,33 @@ std::vector<std::string> split(const std::string &Line) {
   return Fields;
 }
 
-// Select the strongest configurations for each scenario.
+void addResult(std::map<std::string, std::map<std::string, Result>> &Results,
+               const std::string &Scenario, const std::string &First,
+               const std::string &Second, double Normalized,
+               bool LowerIsBetter) {
+
+  const std::string Config = First + "/" + Second;
+  Result &Value            = Results[Scenario][Config];
+  if (Value.Samples == 0) {
+    Value.First  = First;
+    Value.Second = Second;
+    Value.Worst  = Normalized;
+  } else if (LowerIsBetter) {
+    Value.Worst = std::max(Value.Worst, Normalized);
+  } else {
+    Value.Worst = std::min(Value.Worst, Normalized);
+  }
+
+  ++Value.Samples;
+  Value.NormalizedSum += Normalized;
+}
+
+double average(const Result &Value) {
+
+  return Value.NormalizedSum / Value.Samples;
+}
+
+// Select policies by their average normalized result across trace lengths.
 int main(int argc, char **argv) {
 
   const std::string InputFile =
@@ -43,7 +68,7 @@ int main(int argc, char **argv) {
   std::string Line;
   std::getline(Input, Line);
   const bool LowerIsBetter = Line.find("total_cost") != std::string::npos;
-  std::map<std::string, std::vector<Result>> ByScenario;
+  std::map<std::string, std::map<std::string, Result>> ByScenario;
   std::map<std::string, double> References;
 
   while (std::getline(Input, Line)) {
@@ -53,55 +78,59 @@ int main(int argc, char **argv) {
       if (Fields.size() != 10)
         continue;
 
+      const std::string ReferenceKey = Fields[0] + ":" + Fields[3];
       if (Fields[4] == "OPT") {
-        References[Fields[0]] = std::stod(Fields[9]);
+        References[ReferenceKey] = std::stod(Fields[9]);
         continue;
       }
 
-      ByScenario[Fields[0]].push_back(
-          {Fields[0], Fields[4], Fields[5], std::stod(Fields[9])});
+      const auto Reference = References.find(ReferenceKey);
+      if (Reference == References.end())
+        continue;
+
+      const double Normalized = std::stod(Fields[9]) / Reference->second;
+      addResult(ByScenario, Fields[0], Fields[4], Fields[5], Normalized, true);
     } else {
       if (Fields.size() != 8 || Fields[3] == "OPT(2C)")
         continue;
 
-      ByScenario[Fields[0]].push_back(
-          {Fields[0], Fields[3], Fields[4], std::stod(Fields[5]),
-           std::stod(Fields[6]), std::stod(Fields[7])});
+      addResult(ByScenario, Fields[0], Fields[3], Fields[4],
+                std::stod(Fields[7]), false);
     }
   }
 
   std::ofstream Output(OutputFile);
-  if (LowerIsBetter)
-    Output << "rank,scenario,level1,level2,total_cost,reference_cost,"
-              "normalized\n";
-  else
-    Output << "rank,scenario,level1,level2,hits,ideal_hits,normalized\n";
+  Output << "rank,scenario,level1,level2,samples,average_normalized,"
+            "worst_normalized\n";
 
-  for (auto &[Scenario, Results] : ByScenario) {
-    if (LowerIsBetter) {
-      for (Result &Value : Results) {
-        Value.Reference  = References[Scenario];
-        Value.Normalized = Value.Value / Value.Reference;
-      }
-    }
+  for (auto &[Scenario, Configs] : ByScenario) {
+    std::vector<Result> Results;
+    for (const auto &Entry : Configs)
+      Results.push_back(Entry.second);
 
     std::sort(Results.begin(), Results.end(),
               [LowerIsBetter](const Result &Left, const Result &Right) {
-                if (Left.Normalized != Right.Normalized)
-                  return LowerIsBetter ? Left.Normalized < Right.Normalized
-                                       : Left.Normalized > Right.Normalized;
-                return LowerIsBetter ? Left.Value < Right.Value
-                                     : Left.Value > Right.Value;
+                if (average(Left) != average(Right))
+                  return LowerIsBetter ? average(Left) < average(Right)
+                                       : average(Left) > average(Right);
+
+                if (Left.Worst != Right.Worst)
+                  return LowerIsBetter ? Left.Worst < Right.Worst
+                                       : Left.Worst > Right.Worst;
+
+                if (Left.First != Right.First)
+                  return Left.First < Right.First;
+
+                return Left.Second < Right.Second;
               });
 
     const int Count = std::min<int>(Limit, Results.size());
     for (int Index = 0; Index < Count; ++Index) {
       const Result &Value = Results[Index];
-
-      Output << std::defaultfloat << Index + 1 << ',' << Scenario << ','
-             << Value.First << ',' << Value.Second << ',' << Value.Value << ','
-             << Value.Reference << ',' << std::fixed << std::setprecision(6)
-             << Value.Normalized << '\n';
+      Output << Index + 1 << ',' << Scenario << ',' << Value.First << ','
+             << Value.Second << ',' << Value.Samples << ',' << std::fixed
+             << std::setprecision(6) << average(Value) << ',' << Value.Worst
+             << '\n';
     }
   }
 }

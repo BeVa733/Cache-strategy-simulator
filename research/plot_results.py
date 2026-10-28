@@ -16,15 +16,24 @@ def read_rows(path):
         return list(csv.DictReader(stream))
 
 
-def best_by_scenario(rows, three_level=False):
-    best = {}
+def average_normalized(rows, levels=None):
+    grouped = {}
     for row in rows:
-        config = row["config"] if not three_level else "/".join(
-            (row["level1"], row["level2"], row["level3"]))
+        config = row["config"] if levels is None else "/".join(
+            row[f"level{level}"] for level in range(1, levels + 1))
         if config.startswith("OPT"):
             continue
-        scenario = row["scenario"]
-        value = float(row["normalized"])
+        key = (row["scenario"], config)
+        grouped.setdefault(key, []).append(float(row["normalized"]))
+
+    return [(scenario, config, sum(values) / len(values))
+            for (scenario, config), values in grouped.items()]
+
+
+def best_by_scenario(rows, three_level=False):
+    best = {}
+    levels = 3 if three_level else None
+    for scenario, config, value in average_normalized(rows, levels):
         if scenario not in best or value > best[scenario]["value"]:
             best[scenario] = {"config": config, "value": value}
     return best
@@ -58,9 +67,9 @@ def plot_level_comparison(results_dir, output_dir):
                       rotation=90, color="white", fontsize=8)
 
     axis.set_xticks([p + width for p in positions], scenarios)
-    axis.set_ylabel("Normalized hits")
+    axis.set_ylabel("Average normalized hits")
     axis.set_ylim(0, 1.05)
-    axis.set_title("Best normalized result by cache depth")
+    axis.set_title("Best average result by cache depth")
     axis.legend()
     figure.tight_layout()
     figure.savefig(output_dir / "level_comparison.png", dpi=150)
@@ -68,21 +77,20 @@ def plot_level_comparison(results_dir, output_dir):
 
 
 def plot_all_systems(rows, levels, output_path):
-    rows = [row for row in rows if not row["level1"].startswith("OPT")]
-    rows.sort(key=lambda row: float(row["normalized"]), reverse=True)
-    labels = ["/".join(row[f"level{level}"]
-                       for level in range(1, levels + 1)) for row in rows]
-    values = [float(row["normalized"]) for row in rows]
+    values = average_normalized(rows, levels)
+    values.sort(key=lambda value: value[2], reverse=True)
+    labels = [value[1] for value in values]
+    normalized = [value[2] for value in values]
     colors = ["tab:green" if index < 3 else "tab:blue"
-              for index in range(len(rows))]
+              for index in range(len(values))]
 
-    figure, axis = plt.subplots(figsize=(10, max(6, len(rows) * 0.32)))
-    bars = axis.barh(labels, values, color=colors)
+    figure, axis = plt.subplots(figsize=(10, max(6, len(values) * 0.32)))
+    bars = axis.barh(labels, normalized, color=colors)
     axis.invert_yaxis()
     axis.axvline(1.0, color="black", linewidth=1, linestyle="--")
     axis.set_xlim(0, 1.08)
-    axis.set_xlabel("Normalized hits")
-    axis.set_title(f"All {levels}-level systems on mixed workload")
+    axis.set_xlabel("Average normalized hits")
+    axis.set_title(f"All {levels}-level systems, averaged by trace length")
     axis.bar_label(bars, fmt="%.3f", padding=3, fontsize=8)
     figure.tight_layout()
     figure.savefig(output_path, dpi=150)
@@ -94,8 +102,8 @@ def plot_single_level_policies(results_dir, output_dir):
             if row["levels"] == "1" and row["config"] != "OPT"]
     scenarios = sorted({row["scenario"] for row in rows})
     policies = ["LRU", "LFU", "2Q", "ARC", "LIRS"]
-    values = {(row["scenario"], row["config"]):
-              float(row["normalized"]) for row in rows}
+    values = {(scenario, config): value
+              for scenario, config, value in average_normalized(rows)}
     positions = range(len(scenarios))
     width = 0.16
 
@@ -113,12 +121,52 @@ def plot_single_level_policies(results_dir, output_dir):
     axis.axhline(1.0, color="black", linewidth=1, linestyle="--",
                  label="OPT")
     axis.set_xticks([p + 2 * width for p in positions], scenarios)
-    axis.set_ylabel("Normalized hits")
+    axis.set_ylabel("Average normalized hits")
     axis.set_ylim(0, 1.05)
-    axis.set_title("Single-level policies")
+    axis.set_title("Single-level policies, averaged by trace length")
     axis.legend(ncols=6, loc="upper center")
     figure.tight_layout()
     figure.savefig(output_dir / "single_level_policies.png", dpi=150)
+    plt.close(figure)
+
+
+def plot_trace_lengths(results_dir, output_dir):
+    rows = [row for row in read_rows(results_dir / "normalized_results.csv")
+            if row["levels"] == "1" and row["config"] != "OPT"]
+    scenarios = ["cycle", "hot", "scan", "phase", "random", "mixed"]
+    policies = ["LRU", "LFU", "2Q", "ARC", "LIRS"]
+    figure, axes = plt.subplots(2, 3, figsize=(13, 7), sharex=True,
+                               sharey=True)
+    request_labels = {1920: "1.9k", 6400: "6.4k", 19200: "19.2k",
+                      64000: "64k"}
+
+    for axis, scenario in zip(axes.flat, scenarios):
+        scenario_rows = [row for row in rows
+                         if row["scenario"] == scenario]
+        for policy in policies:
+            values = sorted(
+                (int(row["requests"]), float(row["normalized"]))
+                for row in scenario_rows if row["config"] == policy
+            )
+            axis.plot([value[0] for value in values],
+                      [value[1] for value in values], marker="o",
+                      label=policy)
+
+        axis.set_title(scenario)
+        axis.set_xscale("log")
+        axis.set_xticks(list(request_labels))
+        axis.set_xticklabels(list(request_labels.values()))
+        axis.minorticks_off()
+        axis.set_ylim(0, 1.05)
+        axis.grid(alpha=0.3)
+
+    figure.supxlabel("Trace length, requests")
+    figure.supylabel("Hits / OPT hits")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    figure.legend(handles, labels, loc="upper center", ncols=len(policies),
+                  bbox_to_anchor=(0.5, 0.99))
+    figure.tight_layout(rect=(0, 0, 1, 0.92))
+    figure.savefig(output_dir / "trace_length_scaling.png", dpi=150)
     plt.close(figure)
 
 
@@ -126,9 +174,10 @@ def cost_ratios(rows, levels):
     references = {}
     for row in rows:
         if row["level1" if levels > 1 else "policy"].startswith("OPT"):
-            references[row["scenario"]] = float(row["total_cost"])
+            key = (row["scenario"], row["requests"])
+            references[key] = float(row["total_cost"])
 
-    values = []
+    grouped = {}
     for row in rows:
         first = row["level1"] if levels > 1 else row["policy"]
         if first.startswith("OPT"):
@@ -139,10 +188,13 @@ def cost_ratios(rows, levels):
         else:
             config = "/".join(row[f"level{level}"]
                               for level in range(1, levels + 1))
-        ratio = float(row["total_cost"]) / references[row["scenario"]]
-        values.append((row["scenario"], config, ratio))
+        reference_key = (row["scenario"], row["requests"])
+        ratio = float(row["total_cost"]) / references[reference_key]
+        key = (row["scenario"], config)
+        grouped.setdefault(key, []).append(ratio)
 
-    return values
+    return [(scenario, config, sum(values) / len(values))
+            for (scenario, config), values in grouped.items()]
 
 
 def plot_cost_systems(rows, levels, output_path):
@@ -157,8 +209,8 @@ def plot_cost_systems(rows, levels, output_path):
     bars = axis.barh(labels, ratios, color=colors)
     axis.invert_yaxis()
     axis.axvline(1.0, color="black", linewidth=1, linestyle="--")
-    axis.set_xlabel("Cost / OPT cost (lower is better)")
-    axis.set_title(f"Cost of all {levels}-level systems")
+    axis.set_xlabel("Average cost / OPT cost (lower is better)")
+    axis.set_title(f"Average cost of all {levels}-level systems")
     axis.bar_label(bars, fmt="%.3f", padding=3, fontsize=8)
     figure.tight_layout()
     figure.savefig(output_path, dpi=150)
@@ -184,8 +236,8 @@ def plot_single_level_costs(results_dir, output_dir):
                  label="OPT")
     axis.set_xticks([position + 2 * width for position in positions],
                     scenarios)
-    axis.set_ylabel("Cost / OPT cost (lower is better)")
-    axis.set_title("Cost of single-level policies")
+    axis.set_ylabel("Average cost / OPT cost (lower is better)")
+    axis.set_title("Single-level cost, averaged by trace length")
     axis.legend(ncols=6, loc="upper center")
     figure.tight_layout()
     figure.savefig(output_dir / "cost_single_level_policies.png", dpi=150)
@@ -211,8 +263,8 @@ def plot_cost_level_comparison(results_dir, output_dir):
     figure, axis = plt.subplots(figsize=(8, 5))
     bars = axis.bar(labels, ratios)
     axis.axhline(1.0, color="black", linewidth=1, linestyle="--")
-    axis.set_ylabel("Cost / OPT cost (lower is better)")
-    axis.set_title("Best cost by cache depth")
+    axis.set_ylabel("Average cost / OPT cost (lower is better)")
+    axis.set_title("Best average cost by cache depth")
     axis.bar_label(bars, fmt="%.3f", padding=3)
     figure.tight_layout()
     figure.savefig(output_dir / "cost_level_comparison.png", dpi=150)
@@ -231,6 +283,7 @@ def main():
     plot_all_systems(read_rows(results_dir / "three_level_results.csv"), 3,
                      output_dir / "three_level_systems.png")
     plot_single_level_policies(results_dir, output_dir)
+    plot_trace_lengths(results_dir, output_dir)
     plot_cost_systems(
         read_rows(results_dir / "two_level_cost_results.csv"), 2,
         output_dir / "cost_two_level_systems.png")

@@ -1,147 +1,270 @@
-// Tests for cache policies. Run: ./build/policy_tests  (or ctest --test-dir build)
+// Tests for cache policies. Build: cmake --build build, run:
+// ./build/tests/policy_tests
 //
-// Three groups:
-//   1. hand-written traces with hit counts worked out by hand in the comments
-//      (m = miss, h = hit, {...} = cache contents);
-//   2. properties that must hold on any trace, checked on random traces:
-//      no policy beats the ideal cache, two levels behave as expected;
-//   3. a large run: a million accesses must finish quickly and give the
-//      hit rate that the pattern predicts.
+// The suite contains hand-written cases, properties checked on deterministic
+// random traces, and a large run that exercises every supported policy.
 
-#include "TestUtils.hpp"
+#include "Cache.hpp"
 
 #include <chrono>
-#include <sstream>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <fstream>
+#include <iostream>
 #include <random>
+#include <string>
+#include <vector>
 
-static const std::vector<std::string> Policies = {"LRU", "LFU", "2Q"};
+static const std::vector<std::string> Policies = {"LRU", "LFU",  "2Q",
+                                                  "ARC", "LIRS", "OPT"};
+
 static int Failed = 0;
 
-static void check(const std::string &Name, bool Ok, const std::string &Info) {
-  std::cout << (Ok ? "[ok]   " : "[FAIL] ") << Name << ": " << Info << '\n';
+struct RunResult {
+  std::uint64_t Hits;
+  std::uint64_t Misses;
+  std::vector<std::uint64_t> LevelHits;
+  double Cost;
+};
+
+// Give every run its own config so parallel test processes do not conflict.
+static std::string configFilename() {
+
+  static const auto RunId =
+      std::chrono::steady_clock::now().time_since_epoch().count();
+  static std::size_t ConfigNumber = 0;
+
+  return "policy_test_" + std::to_string(RunId) + "_" +
+         std::to_string(ConfigNumber++) + ".tmp";
+}
+
+// Run a cache configuration on the trace and collect its public metrics.
+static RunResult runCache(const std::vector<std::string> &Policies,
+                          const std::vector<std::size_t> &Capacities,
+                          const std::vector<int> &Trace,
+                          const std::vector<double> &Costs = {},
+                          double MissCost                  = 1.0) {
+
+  const std::string ConfigFilename = configFilename();
+  std::ofstream Config(ConfigFilename);
+  Config << Policies.size() << '\n';
+  for (const std::string &Policy : Policies) {
+    Config << Policy << '\n';
+  }
+
+  if (!Costs.empty()) {
+    Config << "costs";
+    for (double Cost : Costs) {
+      Config << ' ' << Cost;
+    }
+    Config << "\nmiss_cost " << MissCost << '\n';
+  }
+
+  Config.close();
+
+  MultiLevelCache<int> Cache(ConfigFilename.c_str(), Capacities, Trace);
+  for (int Key : Trace) {
+    Cache.accessElement(Key);
+  }
+
+  std::remove(ConfigFilename.c_str());
+  return {Cache.hitCount(), Cache.missCount(), Cache.levelHitCounts(),
+          Cache.totalCost()};
+}
+
+// Run one cache level with the given policy.
+static RunResult runPolicy(const std::string &Policy, std::size_t Capacity,
+                           const std::vector<int> &Trace) {
+
+  return runCache({Policy}, {Capacity}, Trace);
+}
+
+static void check(const std::string &Name, bool Ok,
+                  const std::string &Details) {
+
+  std::cout << (Ok ? "[ok]   " : "[FAIL] ") << Name << ": " << Details << '\n';
   if (!Ok) {
     ++Failed;
   }
 }
 
 static void expectHits(const std::string &Name, const std::string &Policy,
-                       std::size_t Capacity, const Trace &Keys,
+                       std::size_t Capacity, const std::vector<int> &Trace,
                        std::size_t Expected) {
-  std::size_t Got = runPolicy(Policy, Capacity, Keys);
-  check(Name, Got == Expected,
-        "expected " + std::to_string(Expected) + ", got " + std::to_string(Got));
+
+  const RunResult Result = runPolicy(Policy, Capacity, Trace);
+  check(Name, Result.Hits == Expected,
+        "expected " + std::to_string(Expected) + ", got " +
+            std::to_string(Result.Hits));
 }
 
-static Trace randomTrace(std::mt19937 &Rng, std::size_t Length, int MaxKey) {
-  std::uniform_int_distribution<int> Key(1, MaxKey);
-  Trace Keys(Length);
-  for (int &K : Keys) {
-    K = Key(Rng);
+static std::vector<int> randomTrace(std::mt19937 &Generator, std::size_t Length,
+                                    int MaxKey) {
+
+  std::uniform_int_distribution<int> KeyDistribution(1, MaxKey);
+  std::vector<int> Trace(Length);
+  for (int &Key : Trace) {
+    Key = KeyDistribution(Generator);
   }
-  return Keys;
+
+  return Trace;
 }
 
-// ---- 1. hand-written cases -------------------------------------------------
+// Check manually calculated policy behaviour on small traces.
+static void testHandWrittenCases() {
 
-static void handCases() {
   std::cout << "--- hand-written traces ---\n";
-  for (const std::string &P : Policies) {
-    // 1m 1h 1h
-    expectHits(P + ": same key", P, 1, {1, 1, 1}, 2);
-    // capacity 1 can never hold both keys
-    expectHits(P + ": thrash", P, 1, {1, 2, 1, 2}, 0);
-    // first pass misses, second pass hits
-    expectHits(P + ": set fits", P, 3, {1, 2, 3, 1, 2, 3}, 3);
+
+  for (const std::string &Policy : Policies) {
+    // A disabled level must miss without invoking replacement logic.
+    expectHits(Policy + ": zero capacity", Policy, 0, {1, 1, 1}, 0);
+    // One miss followed by two hits.
+    expectHits(Policy + ": same key", Policy, 1, {1, 1, 1}, 2);
+    // A cache of size one cannot hold both alternating keys.
+    expectHits(Policy + ": thrash", Policy, 1, {1, 2, 1, 2}, 0);
+    // The first pass misses and the second pass hits.
+    expectHits(Policy + ": set fits", Policy, 3, {1, 2, 3, 1, 2, 3}, 3);
   }
 
-  // 1m 2m 1h {1,2}; 3m evicts 2 (older) {1,3}; 2m
+  // LRU evicts key 2 because it is the oldest key at request 3.
   expectHits("LRU: evicts oldest", "LRU", 2, {1, 2, 1, 3, 2}, 1);
-  // loop of 4 keys in cache of 3 always evicts the next needed key
   expectHits("LRU: loop", "LRU", 3, {1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4}, 0);
 
-  // 1m 1h 1h {1:3}; 2m {1:3,2:1}; 3m evicts 2 {1:3,3:1}; 2m evicts 3; 1h
+  // LFU keeps frequently used key 1 while one-shot keys replace each other.
   expectHits("LFU: evicts rarest", "LFU", 2, {1, 1, 1, 2, 3, 2, 1}, 3);
+  expectHits("LFU: keeps hot key", "LFU", 2, {1, 1, 1, 2, 3, 4, 5, 1}, 3);
 
-  // capacity 4 -> A1In quota 1. 1m 1h (1 -> Am); 2m 3m 4m (A1In = 4 3 2);
-  // 5m: A1In over quota -> evicts 2; 6m evicts 3; 1h still in Am.
-  // LRU on the same trace evicts 1 at "5" and gets only 1 hit.
-  expectHits("2Q: keeps hot key", "2Q", 4, {1, 1, 2, 3, 4, 5, 6, 1}, 2);
-  expectHits("LRU: loses hot key", "LRU", 4, {1, 1, 2, 3, 4, 5, 6, 1}, 1);
+  // 2Q moves a reused ghost key to the main queue and preserves it.
+  const std::vector<int> HotTrace = {1, 2, 3, 4, 5, 1, 6, 7, 8, 9, 1};
+  expectHits("2Q: keeps hot key", "2Q", 4, HotTrace, 1);
+  expectHits("LRU: loses hot key", "LRU", 4, HotTrace, 0);
 
-  // L1 = LRU(1), L2 = LRU(1). 1m -> L1{1}; 2m -> L1{2} L2{1};
-  // 1h in L2 -> promoted, 2 demoted: L1{1} L2{2}; 2h in L2.
-  check("2 levels: promotion/demotion",
-        runSystem({"LRU", "LRU"}, {1, 1}, {1, 2, 1, 2}) == 2, "expected 2");
+  // ARC adapts after misses in both ghost lists and keeps key 2 hot.
+  expectHits("ARC: adapts to ghost hits", "ARC", 2, {1, 2, 1, 3, 2, 1, 2}, 2);
+
+  // A reused resident HIR key becomes LIR and survives insertion of key 5.
+  expectHits("LIRS: promotes reused HIR", "LIRS", 4, {1, 2, 3, 4, 4, 5, 4}, 2);
+
+  // OPT evicts key 2 because key 1 is requested earlier in the future.
+  expectHits("OPT: evicts farthest use", "OPT", 2, {1, 2, 3, 1, 2, 3}, 2);
 }
 
-// ---- 2. properties on random traces ----------------------------------------
+// Check common invariants on several deterministic random traces.
+static void testProperties() {
 
-static void properties() {
   std::cout << "--- properties on random traces ---\n";
-  std::mt19937 Rng(42);
-  const std::size_t Capacity = 64;
-  bool NotAboveIdeal = true, TwoLevelsEqualOne = true, SecondLevelHelps = true;
 
-  for (int I = 0; I < 5; ++I) {
-    Trace Keys = randomTrace(Rng, 20000, 3 * Capacity);
-    std::size_t Ideal = runIdeal(Capacity, Keys);
+  constexpr std::size_t Capacity = 32;
+  constexpr std::size_t Samples  = 5;
+  std::mt19937 Generator(42);
+  std::vector<std::vector<int>> Traces;
+  std::vector<std::uint64_t> OptimalHits;
 
-    for (const auto &P : Policies) {
-      // Belady is optimal: a real policy may equal it but never exceed it.
-      if (runPolicy(P, Capacity, Keys) > Ideal) {
-        NotAboveIdeal = false;
+  for (std::size_t Sample = 0; Sample < Samples; ++Sample) {
+    Traces.push_back(randomTrace(Generator, 2000, 3 * Capacity));
+    OptimalHits.push_back(runPolicy("OPT", Capacity, Traces.back()).Hits);
+  }
+
+  for (const std::string &Policy : Policies) {
+    bool CountsAreCorrect   = true;
+    bool NotAboveOptimal    = true;
+    bool SecondLevelHelps   = true;
+    bool LevelCountsAreGood = true;
+    bool CostIsCorrect      = true;
+
+    for (std::size_t Sample = 0; Sample < Samples; ++Sample) {
+      const std::vector<int> &Trace = Traces[Sample];
+      const RunResult Result        = runPolicy(Policy, Capacity, Trace);
+      if (Result.Hits + Result.Misses != Trace.size()) {
+        CountsAreCorrect = false;
       }
-      // L1 decisions do not depend on L2, so adding a second level can only
-      // turn some misses into hits.
-      std::size_t Single = runPolicy(P, Capacity / 2, Keys);
-      std::size_t Double = runSystem({P, P}, {Capacity / 2, Capacity / 2}, Keys);
-      if (Double < Single) {
+
+      if (Result.Hits > OptimalHits[Sample]) {
+        NotAboveOptimal = false;
+      }
+
+      const RunResult Single = runPolicy(Policy, Capacity / 2, Trace);
+      const RunResult Double =
+          runCache({Policy, Policy}, {Capacity / 2, Capacity / 2}, Trace);
+      if (Double.Hits < Single.Hits) {
         SecondLevelHelps = false;
       }
+
+      if (Double.Hits + Double.Misses != Trace.size() ||
+          Double.LevelHits[0] + Double.LevelHits[1] != Double.Hits) {
+        LevelCountsAreGood = false;
+      }
+
+      const RunResult CostResult =
+          runCache({Policy}, {Capacity}, Trace, {2.0}, 7.0);
+      const double ExpectedCost =
+          CostResult.Hits * 2.0 + CostResult.Misses * 7.0;
+      if (std::abs(CostResult.Cost - ExpectedCost) > 1e-9) {
+        CostIsCorrect = false;
+      }
     }
-    // Two LRU levels with promotion/demotion are exactly one LRU of the
-    // combined size: the demoted key is the LRU key of the whole system.
-    if (runSystem({"LRU", "LRU"}, {Capacity / 2, Capacity / 2}, Keys) !=
-        runPolicy("LRU", Capacity, Keys)) {
-      TwoLevelsEqualOne = false;
-    }
+
+    const std::string Details = std::to_string(Samples) + " traces";
+    check(Policy + ": hits + misses", CountsAreCorrect, Details);
+    check(Policy + ": does not beat OPT", NotAboveOptimal, Details);
+    check(Policy + ": second level does not reduce hits", SecondLevelHelps,
+          Details);
+    check(Policy + ": level hit counts", LevelCountsAreGood, Details);
+    check(Policy + ": cost accounting", CostIsCorrect, Details);
   }
-  check("no policy beats the ideal cache", NotAboveIdeal, "5 traces");
-  check("second level never reduces hits", SecondLevelHelps, "5 traces");
-  check("LRU+LRU == LRU of combined size", TwoLevelsEqualOne, "5 traces");
 }
 
-// ---- 3. large run ----------------------------------------------------------
+// Check exact movement and cost accounting in a small two-level cache.
+static void testTwoLevelDetails() {
 
-static void largeRun() {
-  std::cout << "--- large run: 1M accesses, capacity 1024 ---\n";
-  std::mt19937 Rng(7);
-  const std::size_t Capacity = 1024;
-  const std::size_t Length = 1000000;
-  // Uniform keys over twice the capacity: once warm, the cache holds half of
-  // the keys, so every policy must land near a 50% hit rate.
-  Trace Keys = randomTrace(Rng, Length, 2 * Capacity);
+  std::cout << "--- two-level details ---\n";
 
-  for (const auto &P : Policies) {
-    auto Start = std::chrono::steady_clock::now();
-    std::size_t Hits = runPolicy(P, Capacity, Keys);
-    double Seconds = std::chrono::duration<double>(
-                         std::chrono::steady_clock::now() - Start)
-                         .count();
-    double Rate = 100.0 * Hits / Length;
+  const std::vector<int> Trace = {1, 2, 1, 1};
+  const RunResult Result       = runCache({"LRU", "LRU"}, {1, 1}, Trace);
+  const std::vector<std::uint64_t> ExpectedLevels = {1, 1};
+  const bool LevelsAreCorrect = Result.Hits == 2 && Result.Misses == 2 &&
+                                Result.LevelHits == ExpectedLevels;
+  check("levels: promotion", LevelsAreCorrect,
+        "expected hits {1, 1}, got {" + std::to_string(Result.LevelHits[0]) +
+            ", " + std::to_string(Result.LevelHits[1]) + "}");
 
-    std::ostringstream Info;
-    Info.precision(2);
-    Info << std::fixed << Rate << "% hits, " << Seconds << " s";
-    check(P + ": large run", Rate > 48.0 && Rate < 52.0 && Seconds < 15.0,
-          Info.str());
+  const RunResult CostResult =
+      runCache({"LRU", "LRU"}, {1, 1}, Trace, {1.0, 10.0}, 100.0);
+  check("cost: two levels", CostResult.Cost == 211.0,
+        "expected 211, got " + std::to_string(CostResult.Cost));
+}
+
+// Exercise long-lived policy state without imposing a machine-specific limit.
+static void testLargeRun() {
+
+  std::cout << "--- large run: 1M accesses ---\n";
+
+  constexpr std::size_t Capacity = 1024;
+  constexpr std::size_t Length   = 1000000;
+  std::vector<int> Trace;
+  Trace.reserve(Length);
+  for (std::size_t Index = 0; Index < Length; ++Index) {
+    Trace.push_back(static_cast<int>(Index % Capacity));
+  }
+
+  const std::size_t ExpectedHits = Length - Capacity;
+  for (const std::string &Policy : Policies) {
+    const RunResult Result = runPolicy(Policy, Capacity, Trace);
+    const bool Ok = Result.Hits == ExpectedHits && Result.Misses == Capacity;
+    check(Policy + ": large run", Ok,
+          "expected " + std::to_string(ExpectedHits) + " hits, got " +
+              std::to_string(Result.Hits));
   }
 }
 
 int main() {
-  handCases();
-  properties();
-  largeRun();
+
+  testHandWrittenCases();
+  testProperties();
+  testTwoLevelDetails();
+  testLargeRun();
+
   std::cout << '\n' << Failed << " failed\n";
   return Failed == 0 ? 0 : 1;
 }

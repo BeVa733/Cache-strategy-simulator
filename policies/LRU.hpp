@@ -1,10 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <iostream>
 #include <list>
+#include <optional>
+#include <string>
 #include <unordered_map>
 
-#include "../include/CachePolicy.hpp"
+#include "CachePolicy.hpp"
 
 template <typename KeyType> class LRUPolicy : public CachePolicy<KeyType> {
 

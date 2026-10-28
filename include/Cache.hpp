@@ -1,16 +1,19 @@
 #pragma once
 
-#include "../policies/2Q.hpp"
-#include "../policies/LFU.hpp"
-#include "../policies/LRU.hpp"
-#include "../policies/OPT.hpp"
 #include "CachePolicy.hpp"
 
+#include "2Q.hpp"   // IWYU pragma: keep
+#include "ARC.hpp"  // IWYU pragma: keep
+#include "LFU.hpp"  // IWYU pragma: keep
+#include "LIRS.hpp" // IWYU pragma: keep
+#include "LRU.hpp"  // IWYU pragma: keep
+#include "OPT.hpp"  // IWYU pragma: keep
+
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <functional>
-#include <istream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -45,13 +48,30 @@ public:
              [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<LRUPolicy<KeyType>>(Capacity);
              }},
+
             {"LFU",
              [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<LFUPolicy<KeyType>>(Capacity);
              }},
+
             {"2Q",
              [](std::size_t Capacity, const std::vector<KeyType> &) {
                return std::make_unique<TwoQPolicy<KeyType>>(Capacity);
+             }},
+
+            {"ARC",
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
+               return std::make_unique<ARCPolicy<KeyType>>(Capacity);
+             }},
+
+            {"LIRS",
+             [](std::size_t Capacity, const std::vector<KeyType> &) {
+               return std::make_unique<LIRSPolicy<KeyType>>(Capacity);
+             }},
+
+            {"OPT",
+             [](std::size_t Capacity, const std::vector<KeyType> &Trace) {
+               return std::make_unique<OPTPolicy<KeyType>>(Capacity, Trace);
              }},
     };
 

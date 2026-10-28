@@ -1,4 +1,4 @@
-rank,scenario,level1,level2,total_cost,reference_cost,normalized
-1,mixed,LIRS,LRU,966468,896376,1.078195
-2,mixed,LIRS,2Q,966468,896376,1.078195
-3,mixed,LIRS,ARC,966468,896376,1.078195
+rank,scenario,level1,level2,samples,average_normalized,worst_normalized
+1,mixed,LIRS,LIRS,4,1.273061,1.290117
+2,mixed,ARC,LIRS,4,1.300936,1.374621
+3,mixed,2Q,LIRS,4,1.380142,1.447396

@@ -3,11 +3,13 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <string>
+#include <vector>
 
 int main(int argc, char **argv) {
 
   // Exhaustively evaluate all two-level policy pairs.
-  const auto Settings  = research_runner::settings(argc, argv, 30);
+  const auto Settings  = research_runner::settings(argc, argv);
   const auto Files     = research_runner::temporaryFiles("two_level");
   const auto Policies  = research_runner::policies();
   const auto Scenarios = research_runner::multiLevelScenarios();
@@ -22,60 +24,63 @@ int main(int argc, char **argv) {
   CostCsv << "scenario,level1_capacity,level2_capacity,requests,level1,level2,"
              "level1_cost,level2_cost,miss_cost,total_cost\n";
 
-  for (const std::string &Scenario : Scenarios) {
-    if (!research_runner::generateTrace(Settings.Generator, Scenario,
-                                        Settings.Capacity, Settings.Requests,
-                                        Files.Trace))
-      return 1;
+  for (int Requests : Settings.Requests) {
+    for (const std::string &Scenario : Scenarios) {
+      if (!research_runner::generateTrace(Settings.Generator, Scenario,
+                                          Settings.Capacity, Requests,
+                                          Files.Trace))
+        return 1;
 
-    if (!research_runner::makeIdealTrace(Files.Trace, Files.IdealTrace,
-                                         2 * Settings.Capacity))
-      return 1;
+      if (!research_runner::makeIdealTrace(Files.Trace, Files.IdealTrace,
+                                           2 * Settings.Capacity))
+        return 1;
 
-    research_runner::writeConfig(Files.Config, {"OPT"});
+      research_runner::writeConfig(Files.Config, {"OPT"});
 
-    const int IdealHits = research_runner::runCache(
-        Settings.Cache, Files.Config, Files.IdealTrace, Files.Result);
+      const int IdealHits = research_runner::runCache(
+          Settings.Cache, Files.Config, Files.IdealTrace, Files.Result);
 
-    if (IdealHits < 0)
-      return 1;
+      if (IdealHits < 0)
+        return 1;
 
-    research_runner::writeConfig(Files.Config, {"OPT", "OPT"});
-    const double IdealCost = research_runner::runCacheCost(
-        Settings.Cache, Files.Config, Files.Trace, Files.Result);
-    if (IdealCost < 0.0)
-      return 1;
+      research_runner::writeConfig(Files.Config, {"OPT", "OPT"});
+      const double IdealCost = research_runner::runCacheCost(
+          Settings.Cache, Files.Config, Files.Trace, Files.Result);
+      if (IdealCost < 0.0)
+        return 1;
 
-    Csv << Scenario << ',' << Settings.Capacity << ',' << Settings.Requests
-        << ",OPT(2C),-," << IdealHits << ',' << IdealHits << ",1.000000\n";
-    CostCsv << Scenario << ',' << Settings.Capacity << ','
-            << research_runner::CostCapacityGrowth * Settings.Capacity << ','
-            << Settings.Requests << ",OPT,OPT,1,10,1000," << IdealCost << '\n';
+      Csv << Scenario << ',' << Settings.Capacity << ',' << Requests
+          << ",OPT(2C),-," << IdealHits << ',' << IdealHits << ",1.000000\n";
+      CostCsv << Scenario << ',' << Settings.Capacity << ','
+              << research_runner::CostCapacityGrowth * Settings.Capacity << ','
+              << Requests << ",OPT,OPT,1,10,1000," << IdealCost << '\n';
 
-    for (const std::string &First : Policies) {
-      for (const std::string &Second : Policies) {
-        research_runner::writeConfig(Files.Config, {First, Second});
+      for (const std::string &First : Policies) {
+        for (const std::string &Second : Policies) {
+          research_runner::writeConfig(Files.Config, {First, Second});
 
-        const int Hits = research_runner::runCache(Settings.Cache, Files.Config,
-                                                   Files.Trace, Files.Result);
-        if (Hits < 0)
-          return 1;
+          const int Hits = research_runner::runCache(
+              Settings.Cache, Files.Config, Files.Trace, Files.Result);
+          if (Hits < 0)
+            return 1;
 
-        const double Cost = research_runner::runCacheCost(
-            Settings.Cache, Files.Config, Files.Trace, Files.Result);
-        if (Cost < 0.0)
-          return 1;
+          const double Cost = research_runner::runCacheCost(
+              Settings.Cache, Files.Config, Files.Trace, Files.Result);
+          if (Cost < 0.0)
+            return 1;
 
-        const double Normalized =
-            IdealHits == 0 ? 0.0 : static_cast<double>(Hits) / IdealHits;
+          const double Normalized =
+              IdealHits == 0 ? 0.0 : static_cast<double>(Hits) / IdealHits;
 
-        Csv << Scenario << ',' << Settings.Capacity << ',' << Settings.Requests
-            << ',' << First << ',' << Second << ',' << Hits << ',' << IdealHits
-            << ',' << std::fixed << std::setprecision(6) << Normalized << '\n';
-        CostCsv << Scenario << ',' << Settings.Capacity << ','
-                << research_runner::CostCapacityGrowth * Settings.Capacity
-                << ',' << Settings.Requests << ',' << First << ',' << Second
-                << ",1,10,1000," << Cost << '\n';
+          Csv << Scenario << ',' << Settings.Capacity << ',' << Requests << ','
+              << First << ',' << Second << ',' << Hits << ',' << IdealHits
+              << ',' << std::fixed << std::setprecision(6) << Normalized
+              << '\n';
+          CostCsv << Scenario << ',' << Settings.Capacity << ','
+                  << research_runner::CostCapacityGrowth * Settings.Capacity
+                  << ',' << Requests << ',' << First << ',' << Second
+                  << ",1,10,1000," << Cost << '\n';
+        }
       }
     }
   }

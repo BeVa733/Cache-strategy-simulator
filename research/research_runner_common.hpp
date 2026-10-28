@@ -15,7 +15,7 @@ struct Settings {
   std::string Cache;
   std::string Generator;
   int Capacity;
-  int Requests;
+  std::vector<int> Requests;
 };
 
 // Temporary input and output files used by a single experiment.
@@ -36,23 +36,28 @@ inline std::string executablePath(int argc, char **argv, int index,
   return argc > index ? argv[index] : Default.string();
 }
 
-inline Settings settings(int argc, char **argv, int RequestsMultiplier) {
+inline std::vector<int> requestCounts(int Capacity) {
+  return {30 * Capacity, 100 * Capacity, 300 * Capacity, 1000 * Capacity};
+}
+
+inline Settings settings(int argc, char **argv) {
   const auto Directory = runnerDirectory(argv[0]);
   const int Capacity   = argc > 3 ? std::stoi(argv[3]) : 64;
   return {executablePath(argc, argv, 1, Directory / "../cache"),
           executablePath(argc, argv, 2, Directory / "cache_trace_generator"),
           Capacity,
-          argc > 4 ? std::stoi(argv[4]) : RequestsMultiplier * Capacity};
+          argc > 4 ? std::vector<int>{std::stoi(argv[4])}
+                   : requestCounts(Capacity)};
 }
 
-inline Settings settingsWithLeaders(int argc, char **argv,
-                                    int RequestsMultiplier) {
+inline Settings settingsWithLeaders(int argc, char **argv) {
   const auto Directory = runnerDirectory(argv[0]);
   const int Capacity   = argc > 4 ? std::stoi(argv[4]) : 64;
   return {executablePath(argc, argv, 1, Directory / "../cache"),
           executablePath(argc, argv, 2, Directory / "cache_trace_generator"),
           Capacity,
-          argc > 5 ? std::stoi(argv[5]) : RequestsMultiplier * Capacity};
+          argc > 5 ? std::vector<int>{std::stoi(argv[5])}
+                   : requestCounts(Capacity)};
 }
 
 inline TemporaryFiles temporaryFiles(const std::string &Prefix) {
