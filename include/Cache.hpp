@@ -15,7 +15,7 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /// Forward declaration of a cache level used by MultiLevelCache.
@@ -221,21 +221,20 @@ public:
 
   /// Return the value associated with \p Key or std::nullopt if it exists.
   std::optional<ValueType *> findElement(const KeyType &Key) {
-
-    auto It = Map.find(Key);
-
-    if (It != Map.end()) {
-      return It->second;
-    } else {
-      return std::nullopt;
+    if (CacheSet.find(Key) != CacheSet.end()) {
+      // Return nullptr (valid optional) to signal a hit.
+      return nullptr; 
     }
+    return std::nullopt;
   }
 
   /// Insert \p Key with \p Value in cache
   bool insertElement(const KeyType &Key, ValueType *Value) {
+    // Value is not stored because we only track keys.
+    (void)Value;
 
-    if (Map.find(Key) == Map.end()) {
-      Map.emplace(Key, Value);
+    if (CacheSet.find(Key) == CacheSet.end()) {
+      CacheSet.insert(Key);
       return true;
     } else {
       std::cerr
@@ -246,25 +245,25 @@ public:
 
   /// Remove \p Key and return its value for promotion or cascading eviction.
   std::optional<ValueType *> eraseElement(const KeyType &Key) {
-    auto It = Map.find(Key);
-    if (It == Map.end()) {
+    auto It = CacheSet.find(Key);
+    if (It == CacheSet.end()) {
       return std::nullopt;
     }
 
-    ValueType *Value = It->second;
-    Map.erase(It);
-    return Value;
+    CacheSet.erase(It);
+    // Return nullptr (valid optional) to signal a successful erase.
+    return nullptr; 
   }
 
   /// Return true if is enough space for one element in Cache
-  bool hasFreeSpace(void) { return Map.size() < Capacity_; }
+  bool hasFreeSpace(void) { return CacheSet.size() < Capacity_; }
 
 private:
   /// Max number of elements in this cache level
   std::size_t Capacity_;
 
-  /// Values currently stored in this cache level
-  std::unordered_map<KeyType, ValueType *> Map;
+  /// Keys currently stored in this cache level
+  std::unordered_set<KeyType> CacheSet;
 
 public:
   /// Replacement policy used when this level.
