@@ -19,6 +19,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -239,28 +240,26 @@ public:
 
   /// Return true if Key is stored in this level.
   bool findElement(const KeyType &Key) const {
-    return Map.find(Key) != Map.end();
+    return Set.find(Key) != Set.end();
   }
 
   /// Insert Key into this level.
   bool insertElement(const KeyType &Key) {
-    return Map.emplace(Key, true).second;
+    return Set.insert(Key).second;
   }
 
   /// Remove Key from this level.
-  bool eraseElement(const KeyType &Key) { return Map.erase(Key) != 0; }
+  bool eraseElement(const KeyType &Key) { return Set.erase(Key) != 0; }
 
   /// Return true if there is enough space for one key.
-  bool hasFreeSpace() const { return Map.size() < Capacity_; }
+  bool hasFreeSpace() const { return Set.size() < Capacity_; }
 
   bool hasCapacity() const { return Capacity_ != 0; }
 
 private:
   std::size_t Capacity_;
 
-  // The mapped flag is not used: unordered_map is intentionally kept as the
-  // storage structure of the original project, while values are not simulated.
-  std::unordered_map<KeyType, bool> Map;
+  std::unordered_set<KeyType> Set;
 
 public:
   std::unique_ptr<CachePolicy<KeyType>> Policy;
