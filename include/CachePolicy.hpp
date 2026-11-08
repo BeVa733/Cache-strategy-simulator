@@ -34,7 +34,7 @@ public:
   virtual std::optional<KeyType> selectVictim(void) = 0;
 
   /// Notify the policy about a new request (required only for OPT).
-  virtual void onRequest(const KeyType&) {}
+  virtual void onRequest(const KeyType &) {}
 
   virtual ~CachePolicy() = default;
 };

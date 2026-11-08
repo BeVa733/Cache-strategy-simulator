@@ -244,9 +244,7 @@ public:
   }
 
   /// Insert Key into this level.
-  bool insertElement(const KeyType &Key) {
-    return Set.insert(Key).second;
-  }
+  bool insertElement(const KeyType &Key) { return Set.insert(Key).second; }
 
   /// Remove Key from this level.
   bool eraseElement(const KeyType &Key) { return Set.erase(Key) != 0; }
