@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iostream>
 #include <list>
 #include <optional>
 #include <string>
@@ -38,16 +37,6 @@ public:
   }
 
   void onCacheInsert(const KeyType &Key) override {
-    if (Index_.size() >= Capacity_) {
-      std::cerr << "[2Q] Error: try to insert extra element (corrupted)\n";
-      return;
-    }
-
-    if (Index_.find(Key) != Index_.end()) {
-      std::cerr << "[2Q] Error: try to insert existing key (corrupted)\n";
-      return;
-    }
-
     if (InsertInAm_) {
       Am_.push_front(Key);
       Index_[Key] = Entry{Queue::Am, Am_.begin()};
@@ -60,25 +49,14 @@ public:
   }
 
   void onCacheHit(const KeyType &Key) override {
-    auto It = Index_.find(Key);
-    if (It == Index_.end()) {
-      std::cerr << "[2Q] Error: hit on unknown key (corrupted)\n";
-      return;
-    }
-
-    Entry &E = It->second;
+    Entry &E = Index_.find(Key)->second;
     if (E.Where == Queue::Am) {
       Am_.splice(Am_.begin(), Am_, E.It);
     }
   }
 
   void onCacheErase(const KeyType &Key) override {
-    auto It = Index_.find(Key);
-    if (It == Index_.end()) {
-      std::cerr << "[2Q] Error: try to delete undefined element\n";
-      return;
-    }
-
+    auto It        = Index_.find(Key);
     const Entry &E = It->second;
     if (E.Where == Queue::A1In) {
       A1In_.erase(E.It);
@@ -102,13 +80,12 @@ public:
     if (!Am_.empty()) {
       return Am_.back();
     }
-    if (!A1In_.empty()) {
-      VictimToA1Out_ = A1In_.back();
-      return VictimToA1Out_;
-    }
 
-    std::cerr << "[2Q] Warning: try to search victim in empty cache\n";
-    return std::nullopt;
+    if (A1In_.empty())
+      return std::nullopt;
+
+    VictimToA1Out_ = A1In_.back();
+    return VictimToA1Out_;
   }
 
 private:

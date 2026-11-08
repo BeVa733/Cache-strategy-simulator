@@ -102,7 +102,7 @@ inline std::string scenarioArgument(const std::string &Scenario, int Capacity) {
   return {};
 }
 
-inline bool generateTrace(const std::string &Generator,
+inline void generateTrace(const std::string &Generator,
                           const std::string &Scenario, int Capacity,
                           int Requests, const std::string &TraceFile) {
 
@@ -114,7 +114,7 @@ inline bool generateTrace(const std::string &Generator,
   if (!Argument.empty())
     Command += " " + Argument;
 
-  return std::system((Command + " > " + TraceFile).c_str()) == 0;
+  std::system((Command + " > " + TraceFile).c_str());
 }
 
 inline void writeConfig(const std::string &ConfigFile,
@@ -136,11 +136,9 @@ inline void writeConfig(const std::string &ConfigFile,
 inline int runCache(const std::string &Cache, const std::string &ConfigFile,
                     const std::string &TraceFile,
                     const std::string &ResultFile) {
-  // Return -1 when the simulator process fails.
   const std::string Command =
       Cache + " " + ConfigFile + " < " + TraceFile + " > " + ResultFile;
-  if (std::system(Command.c_str()) != 0)
-    return -1;
+  std::system(Command.c_str());
 
   std::ifstream Result(ResultFile);
   int Hits = 0;
@@ -157,8 +155,7 @@ inline double runCacheCost(const std::string &Cache,
                               " --cost --capacity-growth " +
                               std::to_string(CostCapacityGrowth) + " < " +
                               TraceFile + " > " + ResultFile;
-  if (std::system(Command.c_str()) != 0)
-    return -1.0;
+  std::system(Command.c_str());
 
   std::ifstream Result(ResultFile);
   double Cost = 0.0;
@@ -166,26 +163,22 @@ inline double runCacheCost(const std::string &Cache,
   return Cost;
 }
 
-inline bool makeIdealTrace(const std::string &TraceFile,
+inline void makeIdealTrace(const std::string &TraceFile,
                            const std::string &IdealTraceFile, int Capacity) {
   // Reuse the trace while changing only the capacity header.
   std::ifstream Trace(TraceFile);
   std::ofstream Ideal(IdealTraceFile);
   int OldCapacity = 0;
   int Requests    = 0;
-  if (!(Trace >> OldCapacity >> Requests))
-    return false;
+  Trace >> OldCapacity >> Requests;
 
   Ideal << Capacity << ' ' << Requests;
   for (int i = 0; i < Requests; ++i) {
     int Key = 0;
-    if (!(Trace >> Key))
-      return false;
-
+    Trace >> Key;
     Ideal << ' ' << Key;
   }
   Ideal << '\n';
-  return true;
 }
 
 } // namespace research_runner

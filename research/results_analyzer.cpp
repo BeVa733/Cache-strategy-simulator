@@ -75,23 +75,16 @@ int main(int argc, char **argv) {
     const auto Fields = split(Line);
 
     if (LowerIsBetter) {
-      if (Fields.size() != 10)
-        continue;
-
       const std::string ReferenceKey = Fields[0] + ":" + Fields[3];
       if (Fields[4] == "OPT") {
         References[ReferenceKey] = std::stod(Fields[9]);
         continue;
       }
 
-      const auto Reference = References.find(ReferenceKey);
-      if (Reference == References.end())
-        continue;
-
-      const double Normalized = std::stod(Fields[9]) / Reference->second;
+      const double Normalized = std::stod(Fields[9]) / References[ReferenceKey];
       addResult(ByScenario, Fields[0], Fields[4], Fields[5], Normalized, true);
     } else {
-      if (Fields.size() != 8 || Fields[3] == "OPT(2C)")
+      if (Fields[3] == "OPT(2C)")
         continue;
 
       addResult(ByScenario, Fields[0], Fields[3], Fields[4],

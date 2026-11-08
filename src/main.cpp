@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -94,13 +93,6 @@ int main(int argc, char **argv) {
 
     for (std::size_t Level = 0; Level < NumLevels; ++Level) {
       Capacities.push_back(LevelCapacity);
-      if (Level + 1 == NumLevels)
-        continue;
-
-      if (LevelCapacity >
-          std::numeric_limits<std::size_t>::max() / CapacityGrowth)
-        throw std::runtime_error("Cache capacity overflow");
-
       LevelCapacity *= CapacityGrowth;
     }
 

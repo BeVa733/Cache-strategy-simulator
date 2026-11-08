@@ -26,28 +26,20 @@ int main(int argc, char **argv) {
 
   for (int Requests : Settings.Requests) {
     for (const std::string &Scenario : Scenarios) {
-      if (!research_runner::generateTrace(Settings.Generator, Scenario,
-                                          Settings.Capacity, Requests,
-                                          Files.Trace))
-        return 1;
+      research_runner::generateTrace(Settings.Generator, Scenario,
+                                     Settings.Capacity, Requests, Files.Trace);
 
-      if (!research_runner::makeIdealTrace(Files.Trace, Files.IdealTrace,
-                                           2 * Settings.Capacity))
-        return 1;
+      research_runner::makeIdealTrace(Files.Trace, Files.IdealTrace,
+                                      2 * Settings.Capacity);
 
       research_runner::writeConfig(Files.Config, {"OPT"});
 
       const int IdealHits = research_runner::runCache(
           Settings.Cache, Files.Config, Files.IdealTrace, Files.Result);
 
-      if (IdealHits < 0)
-        return 1;
-
       research_runner::writeConfig(Files.Config, {"OPT", "OPT"});
       const double IdealCost = research_runner::runCacheCost(
           Settings.Cache, Files.Config, Files.Trace, Files.Result);
-      if (IdealCost < 0.0)
-        return 1;
 
       Csv << Scenario << ',' << Settings.Capacity << ',' << Requests
           << ",OPT(2C),-," << IdealHits << ',' << IdealHits << ",1.000000\n";
@@ -61,13 +53,9 @@ int main(int argc, char **argv) {
 
           const int Hits = research_runner::runCache(
               Settings.Cache, Files.Config, Files.Trace, Files.Result);
-          if (Hits < 0)
-            return 1;
 
           const double Cost = research_runner::runCacheCost(
               Settings.Cache, Files.Config, Files.Trace, Files.Result);
-          if (Cost < 0.0)
-            return 1;
 
           const double Normalized =
               IdealHits == 0 ? 0.0 : static_cast<double>(Hits) / IdealHits;

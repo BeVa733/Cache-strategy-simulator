@@ -139,9 +139,7 @@ public:
         return true;
       }
 
-      if (!CacheLevels[Level]->eraseElement(Key)) {
-        throw std::logic_error("Unable to promote cached key");
-      }
+      CacheLevels[Level]->eraseElement(Key);
       CacheLevels[Level]->Policy->onCacheErase(Key);
       break;
     }
@@ -163,22 +161,16 @@ public:
       }
 
       if (CL->hasFreeSpace()) {
-        if (!CL->insertElement(PendingKey)) {
-          throw std::logic_error("Duplicate key during cache insertion");
-        }
+        CL->insertElement(PendingKey);
         CL->Policy->onCacheInsert(PendingKey);
         break;
       }
 
       const std::optional<KeyType> VictimKey = CL->Policy->selectVictim();
-      if (!VictimKey || !CL->eraseElement(*VictimKey)) {
-        throw std::logic_error("Replacement policy selected no valid victim");
-      }
+      CL->eraseElement(*VictimKey);
       CL->Policy->onCacheErase(*VictimKey);
 
-      if (!CL->insertElement(PendingKey)) {
-        throw std::logic_error("Duplicate key during cache replacement");
-      }
+      CL->insertElement(PendingKey);
       CL->Policy->onCacheInsert(PendingKey);
 
       PendingKey = *VictimKey;
@@ -244,10 +236,10 @@ public:
   }
 
   /// Insert Key into this level.
-  bool insertElement(const KeyType &Key) { return Set.insert(Key).second; }
+  void insertElement(const KeyType &Key) { Set.insert(Key); }
 
   /// Remove Key from this level.
-  bool eraseElement(const KeyType &Key) { return Set.erase(Key) != 0; }
+  void eraseElement(const KeyType &Key) { Set.erase(Key); }
 
   /// Return true if there is enough space for one key.
   bool hasFreeSpace() const { return Set.size() < Capacity_; }
