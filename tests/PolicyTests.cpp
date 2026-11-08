@@ -6,7 +6,6 @@
 
 #include "Cache.hpp"
 
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -28,17 +27,6 @@ struct RunResult {
   double Cost;
 };
 
-// Give every run its own config so parallel test processes do not conflict.
-static std::string configFilename() {
-
-  static const auto RunId =
-      std::chrono::steady_clock::now().time_since_epoch().count();
-  static std::size_t ConfigNumber = 0;
-
-  return "policy_test_" + std::to_string(RunId) + "_" +
-         std::to_string(ConfigNumber++) + ".tmp";
-}
-
 // Run a cache configuration on the trace and collect its public metrics.
 static RunResult runCache(const std::vector<std::string> &Policies,
                           const std::vector<std::size_t> &Capacities,
@@ -46,7 +34,7 @@ static RunResult runCache(const std::vector<std::string> &Policies,
                           const std::vector<double> &Costs = {},
                           double MissCost                  = 1.0) {
 
-  const std::string ConfigFilename = configFilename();
+  const std::string ConfigFilename = "policy_test.tmp";
   std::ofstream Config(ConfigFilename);
   Config << Policies.size() << '\n';
   for (const std::string &Policy : Policies) {
