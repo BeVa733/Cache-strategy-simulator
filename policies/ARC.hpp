@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iostream>
 #include <list>
 #include <optional>
 #include <stdexcept>
@@ -116,17 +115,6 @@ public:
   }
 
   void onCacheInsert(const KeyType &Key) override {
-
-    if (Entries_.find(Key) != Entries_.end()) {
-      std::cerr << "[ARC] Error: try to insert existing key (corrupted)\n";
-      return;
-    }
-
-    if (FreshCache_.size() + HotCache_.size() >= Capacity_) {
-      std::cerr << "[ARC] Error: try to insert extra element (corrupted)\n";
-      return;
-    }
-
     addToFront(Key,
                InsertAsHotCache_ ? ListType::HotCache_ : ListType::FreshCache_);
 
@@ -136,12 +124,7 @@ public:
   }
 
   void onCacheHit(const KeyType &Key) override {
-
     auto It = Entries_.find(Key);
-    if (It == Entries_.end()) {
-      std::cerr << "[ARC] Error: hit on unknown key (corrupted)\n";
-      return;
-    }
 
     if (It->second.List == ListType::FreshCache_) {
       moveToFront(Key, ListType::FreshCache_, ListType::HotCache_);
@@ -151,13 +134,7 @@ public:
   }
 
   void onCacheErase(const KeyType &Key) override {
-
-    auto It = Entries_.find(Key);
-    if (It == Entries_.end()) {
-      std::cerr << "[ARC] Error: erase on unknown key (corrupted)\n";
-      return;
-    }
-
+    auto It              = Entries_.find(Key);
     ListType CurrentList = It->second.List;
 
     if (CurrentList == ListType::FreshCache_) {
@@ -166,16 +143,12 @@ public:
       } else {
         eraseEntry(Key);
       }
-    } else if (CurrentList == ListType::HotCache_) {
+    } else {
       if (VictimGoesToGhost_) {
         moveToFront(Key, ListType::HotCache_, ListType::HotGhosts_);
       } else {
         eraseEntry(Key);
       }
-    } else {
-      std::cerr
-          << "[ARC] Error: try to erase non-resident element (corrupted)\n";
-      return;
     }
 
     VictimGoesToGhost_  = false;
@@ -183,11 +156,8 @@ public:
   }
 
   std::optional<KeyType> selectVictim(void) override {
-
-    if (FreshCache_.empty() && HotCache_.empty()) {
-      std::cerr << "[ARC] Warning: try to search victim in empty cache\n";
+    if (FreshCache_.empty() && HotCache_.empty())
       return std::nullopt;
-    }
 
     if (DiscardFreshVictim_) {
       return FreshCache_.back();
@@ -217,12 +187,7 @@ private:
   }
 
   void moveToFront(const KeyType &Key, ListType From, ListType To) {
-
     auto It = Entries_.find(Key);
-    if (It == Entries_.end()) {
-      std::cerr << "[ARC] Error: move on unknown key (corrupted)\n";
-      return;
-    }
 
     std::list<KeyType> &FromList = getList(From);
     std::list<KeyType> &ToList   = getList(To);
@@ -236,13 +201,7 @@ private:
   }
 
   void eraseEntry(const KeyType &Key) {
-
-    auto It = Entries_.find(Key);
-    if (It == Entries_.end()) {
-      std::cerr << "[ARC] Error: erase on unknown key (corrupted)\n";
-      return;
-    }
-
+    auto It                  = Entries_.find(Key);
     std::list<KeyType> &List = getList(It->second.List);
 
     List.erase(It->second.Iterator);
@@ -251,11 +210,7 @@ private:
 
   void removeLRU(ListType List) {
     std::list<KeyType> &TargetList = getList(List);
-    if (TargetList.empty()) {
-      return;
-    }
-
-    KeyType Key = TargetList.back();
+    KeyType Key                    = TargetList.back();
     eraseEntry(Key);
   }
 
@@ -273,7 +228,7 @@ private:
     }
 
     // Unreachable with correct usage, but we protect against it anyway.
-    throw std::logic_error("ARCPolicy::getList: unknown ListType");
+    throw std::runtime_error("ARCPolicy::getList: unknown ListType");
   }
 
 private:

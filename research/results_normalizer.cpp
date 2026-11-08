@@ -34,9 +34,6 @@ int main(int argc, char **argv) {
 
   while (std::getline(Single, Line)) {
     const auto Fields = split(Line);
-    if (Fields.size() != 6)
-      continue;
-
     const std::string Key =
         Fields[0] + ":" + Fields[1] + ":" + Fields[2] + ":" + Fields[3];
 
@@ -70,9 +67,6 @@ int main(int argc, char **argv) {
 
   while (std::getline(TwoLevel, Line)) {
     const auto Fields = split(Line);
-
-    if (Fields.size() != 8)
-      continue;
 
     const int Capacity  = std::stoi(Fields[1]);
     const int Hits      = std::stoi(Fields[5]);

@@ -31,8 +31,7 @@ Leaders readLeaders(const std::string &Filename) {
 
   while (std::getline(Input, Line)) {
     const auto Fields = split(Line);
-    if (Fields.size() == 7)
-      Result[Fields[1]].push_back({Fields[2], Fields[3]});
+    Result[Fields[1]].push_back({Fields[2], Fields[3]});
   }
 
   return Result;
@@ -82,27 +81,20 @@ int main(int argc, char **argv) {
 
   for (int Requests : Settings.Requests) {
     for (const std::string &Scenario : research_runner::multiLevelScenarios()) {
-      if (!research_runner::generateTrace(Settings.Generator, Scenario,
-                                          Settings.Capacity, Requests,
-                                          Files.Trace))
-        return 1;
+      research_runner::generateTrace(Settings.Generator, Scenario,
+                                     Settings.Capacity, Requests, Files.Trace);
 
-      if (!research_runner::makeIdealTrace(Files.Trace, Files.IdealTrace,
-                                           3 * Settings.Capacity))
-        return 1;
+      research_runner::makeIdealTrace(Files.Trace, Files.IdealTrace,
+                                      3 * Settings.Capacity);
 
       research_runner::writeConfig(Files.Config, {"OPT"});
 
       const int IdealHits = research_runner::runCache(
           Settings.Cache, Files.Config, Files.IdealTrace, Files.Result);
-      if (IdealHits < 0)
-        return 1;
 
       research_runner::writeConfig(Files.Config, {"OPT", "OPT", "OPT"});
       const double IdealCost = research_runner::runCacheCost(
           Settings.Cache, Files.Config, Files.Trace, Files.Result);
-      if (IdealCost < 0.0)
-        return 1;
 
       Csv << Scenario << ',' << Settings.Capacity << ',' << Requests
           << ",OPT(3C),-,-," << IdealHits << ',' << IdealHits << ",1.000000\n";
@@ -114,9 +106,11 @@ int main(int argc, char **argv) {
               << ',' << ThirdCapacity << ',' << Requests
               << ",OPT,OPT,OPT,1,10,100,1000," << IdealCost << '\n';
 
-      const auto HitCandidates  = makeCandidates(HitLeaders.at(Scenario));
-      const auto CostCandidates = makeCandidates(CostLeaders.at(Scenario));
-      auto Candidates           = HitCandidates;
+      const auto HitCandidates =
+          makeCandidates(HitLeaders.find(Scenario)->second);
+      const auto CostCandidates =
+          makeCandidates(CostLeaders.find(Scenario)->second);
+      auto Candidates = HitCandidates;
       Candidates.insert(CostCandidates.begin(), CostCandidates.end());
 
       for (const std::string &Candidate : Candidates) {
@@ -127,8 +121,6 @@ int main(int argc, char **argv) {
         if (HitCandidates.count(Candidate) != 0) {
           const int Hits = research_runner::runCache(
               Settings.Cache, Files.Config, Files.Trace, Files.Result);
-          if (Hits < 0)
-            return 1;
 
           const double Normalized =
               IdealHits == 0 ? 0.0 : static_cast<double>(Hits) / IdealHits;
@@ -141,8 +133,6 @@ int main(int argc, char **argv) {
         if (CostCandidates.count(Candidate) != 0) {
           const double Cost = research_runner::runCacheCost(
               Settings.Cache, Files.Config, Files.Trace, Files.Result);
-          if (Cost < 0.0)
-            return 1;
 
           CostCsv << Scenario << ',' << Settings.Capacity << ','
                   << SecondCapacity << ',' << ThirdCapacity << ',' << Requests

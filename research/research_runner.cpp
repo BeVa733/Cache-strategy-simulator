@@ -24,10 +24,8 @@ int main(int argc, char **argv) {
 
   for (int Requests : Settings.Requests) {
     for (const std::string &Scenario : research_runner::scenarios()) {
-      if (!research_runner::generateTrace(Settings.Generator, Scenario,
-                                          Settings.Capacity, Requests,
-                                          Files.Trace))
-        return 1;
+      research_runner::generateTrace(Settings.Generator, Scenario,
+                                     Settings.Capacity, Requests, Files.Trace);
 
       const std::string Argument =
           research_runner::scenarioArgument(Scenario, Settings.Capacity);
@@ -37,13 +35,8 @@ int main(int argc, char **argv) {
         const int Hits = research_runner::runCache(Settings.Cache, Files.Config,
                                                    Files.Trace, Files.Result);
 
-        if (Hits < 0)
-          return 1;
-
         const double Cost = research_runner::runCacheCost(
             Settings.Cache, Files.Config, Files.Trace, Files.Result);
-        if (Cost < 0.0)
-          return 1;
 
         Csv << Scenario << ',' << Settings.Capacity << ',' << Requests << ','
             << Argument << ',' << Policy << ',' << Hits << '\n';

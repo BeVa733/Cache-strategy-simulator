@@ -1,2 +1,7 @@
 CompileFlags:
   CompilationDatabase: build
+  Add:
+    - -I../include
+    - -I../policies
+    - -I../../include
+    - -I../../policies

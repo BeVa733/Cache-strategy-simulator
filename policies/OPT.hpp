@@ -21,48 +21,27 @@ public:
 
   // Caller must invoke it for each request.
   void onRequest(const KeyType &key) override {
-    if (currentPosition_ >= requestTrace_.size()) {
-      throw std::out_of_range("OPT: request trace is exhausted");
-    }
+    if (currentPosition_ >= requestTrace_.size())
+      throw std::runtime_error("OPT: request trace is exhausted");
 
-    // Key must match trace at current position.
-    if (!(requestTrace_[currentPosition_] == key)) {
-      throw std::logic_error("OPT: request does not match the trace");
-    }
+    if (!(requestTrace_[currentPosition_] == key))
+      throw std::runtime_error("OPT: request does not match the trace");
 
     ++currentPosition_;
   }
 
   bool needInsertInCache(const KeyType &) override { return capacity_ > 0; }
 
-  void onCacheInsert(const KeyType &key) override {
-    if (residents_.size() >= capacity_) {
-      throw std::logic_error("OPT: cache capacity exceeded");
-    }
-
-    // insert().second == false means key already present.
-    if (!residents_.insert(key).second) {
-      throw std::logic_error("OPT: duplicate cache insertion");
-    }
-  }
+  void onCacheInsert(const KeyType &key) override { residents_.insert(key); }
 
   // OPT does not react to hits: victim choice depends only on the future.
-  void onCacheHit(const KeyType &key) override {
-    if (residents_.find(key) == residents_.end()) {
-      throw std::logic_error("OPT: hit on a non-resident key");
-    }
-  }
+  void onCacheHit(const KeyType &) override {}
 
-  void onCacheErase(const KeyType &key) override {
-    if (residents_.erase(key) == 0) {
-      throw std::logic_error("OPT: erasing a non-resident key");
-    }
-  }
+  void onCacheErase(const KeyType &key) override { residents_.erase(key); }
 
   std::optional<KeyType> selectVictim() override {
-    if (residents_.empty()) {
+    if (residents_.empty())
       return std::nullopt;
-    }
 
     auto victim                 = residents_.begin();
     std::size_t farthestNextUse = 0;

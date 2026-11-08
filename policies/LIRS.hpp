@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iostream>
 #include <iterator>
 #include <list>
 #include <optional>
@@ -39,16 +38,7 @@ public:
   bool needInsertInCache(const KeyType &) override { return Capacity_ != 0; }
 
   void onCacheInsert(const KeyType &Key) override {
-    if (Capacity_ == 0) {
-      return;
-    }
-
     auto It = Entries_.find(Key);
-    if (It != Entries_.end() && It->second.Resident) {
-      std::cerr << "[LIRS] Error: try to insert resident element\n";
-      return;
-    }
-
     if (It == Entries_.end()) {
       Entry NewEntry{EntryType::HIR, false, false, false, ListIt{}, ListIt{}};
       It = Entries_.emplace(Key, NewEntry).first;
@@ -85,12 +75,7 @@ public:
   }
 
   void onCacheHit(const KeyType &Key) override {
-    auto It = Entries_.find(Key);
-    if (It == Entries_.end() || !It->second.Resident) {
-      std::cerr << "[LIRS] Error: hit on unknown or non-resident element\n";
-      return;
-    }
-
+    auto It      = Entries_.find(Key);
     Entry &Entry = It->second;
     if (Entry.Type == EntryType::LIR) {
       if (Entry.InStack) {
@@ -127,12 +112,7 @@ public:
   }
 
   void onCacheErase(const KeyType &Key) override {
-    auto It = Entries_.find(Key);
-    if (It == Entries_.end() || !It->second.Resident) {
-      std::cerr << "[LIRS] Error: erase on unknown or non-resident element\n";
-      return;
-    }
-
+    auto It        = Entries_.find(Key);
     Entry &Entry   = It->second;
     Entry.Resident = false;
 
@@ -156,10 +136,9 @@ public:
   }
 
   std::optional<KeyType> selectVictim() override {
-    if (Queue_.empty()) {
-      std::cerr << "[LIRS] Warning: try to search victim in empty HIR queue\n";
+    if (Queue_.empty())
       return std::nullopt;
-    }
+
     return Queue_.back();
   }
 
@@ -174,13 +153,13 @@ private:
 
   void addToStackFront(const KeyType &Key) {
     Stack_.push_front(Key);
-    Entry &Entry  = Entries_.at(Key);
+    Entry &Entry  = Entries_.find(Key)->second;
     Entry.StackIt = Stack_.begin();
     Entry.InStack = true;
   }
 
   void moveToStackFront(const KeyType &Key) {
-    Entry &Entry = Entries_.at(Key);
+    Entry &Entry = Entries_.find(Key)->second;
     if (!Entry.InStack) {
       addToStackFront(Key);
       return;
@@ -191,7 +170,7 @@ private:
 
   void addToQueueFront(const KeyType &Key) {
     Queue_.push_front(Key);
-    Entry &Entry  = Entries_.at(Key);
+    Entry &Entry  = Entries_.find(Key)->second;
     Entry.QueueIt = Queue_.begin();
     Entry.InQueue = true;
   }
@@ -211,7 +190,7 @@ private:
 
     for (auto It = Stack_.end(); It != Stack_.begin();) {
       --It;
-      Entry &Candidate = Entries_.at(*It);
+      Entry &Candidate = Entries_.find(*It)->second;
       if (Candidate.Type == EntryType::LIR && *It != PromotedKey) {
         Candidate.Type = EntryType::HIR;
         --LIRSize_;
@@ -221,7 +200,7 @@ private:
     }
 
     // Defensive fallback for an inconsistent state.
-    Entry &Promoted = Entries_.at(PromotedKey);
+    Entry &Promoted = Entries_.find(PromotedKey)->second;
     Promoted.Type   = EntryType::HIR;
     --LIRSize_;
     addToQueueFront(PromotedKey);
